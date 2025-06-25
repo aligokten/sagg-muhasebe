@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, forwardRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { LayoutDashboard, Receipt, ShoppingCart, BarChart3, Settings, PlusCircle, X, Users, Package, Landmark, Printer, Eye, Edit, Send, MoreVertical } from 'lucide-react';
+import { LayoutDashboard, Receipt, ShoppingCart, BarChart3, Settings, PlusCircle, X, Users, Package, Landmark, Printer, Eye, Edit, Send, MoreVertical, AlertTriangle } from 'lucide-react';
 
 // Firebase Imports
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, query, Timestamp, setDoc, updateDoc } from 'firebase/firestore';
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// --- Firebase Configuration ---
+// Bu bilgiler sizin Firebase projenizden alınmıştır.
 const firebaseConfig = {
   apiKey: "AIzaSyB3UzsOhB0u8kvha-kPioQX6YYRrOhEAvk",
   authDomain: "sagg-muhasebe.firebaseapp.com",
@@ -19,15 +19,11 @@ const firebaseConfig = {
   measurementId: "G-PM7WXNEQG9"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-sagg-muhasebe';
-
-// --- App Initialization ---
+// --- App Initialization (Tek ve Doğru Blok) ---
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const appId = 'sagg-muhasebe-app'; // App ID'yi burada sabit olarak tanımlıyoruz.
 
 // --- Helper Functions ---
 const formatCurrency = (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value || 0);
@@ -47,6 +43,7 @@ function numberToWordsTr(num) {
 export default function App() {
     const [userId, setUserId] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [authError, setAuthError] = useState(null);
     const [scriptsLoaded, setScriptsLoaded] = useState(false);
     const [currentPage, setCurrentPage] = useState('dashboard');
     const [data, setData] = useState({ invoices: [], expenses: [], customers: [], products: [], accounts: [], companyProfile: { companyName: "", address: "", bankAccounts: [] } });
@@ -65,19 +62,29 @@ export default function App() {
         ]).then(() => setScriptsLoaded(true)).catch(err => console.error("PDF libraries failed to load", err));
         
         const unsubAuth = onAuthStateChanged(auth, async (user) => {
-            if (user) setUserId(user.uid);
-            else {
+            if (user) {
+                setUserId(user.uid);
+            } else {
                 try {
-                    if (typeof __initial_auth_token !== 'undefined') await signInWithCustomToken(auth, __initial_auth_token);
-                    else await signInAnonymously(auth);
-                } catch (error) { console.error("Authentication Error:", error); }
+                   await signInAnonymously(auth);
+                } catch (error) {
+                    if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
+                        setAuthError("Firebase projenizde kimlik doğrulama yapılandırılmamış. Lütfen Firebase konsolundan Authentication > Sign-in method sekmesine gidin ve 'Anonymous' (Anonim) sağlayıcısını etkinleştirin.");
+                    } else {
+                        setAuthError("Kimlik doğrulanırken bir hata oluştu: " + error.message);
+                    }
+                    console.error("Authentication Error:", error); 
+                    setLoading(false); 
+                }
             }
         });
         return () => unsubAuth();
     }, []);
 
     useEffect(() => {
-        if (!userId) return;
+        if (!userId) {
+            return;
+        }
         setLoading(true);
         const collectionsToFetch = ['invoices', 'expenses', 'customers', 'products', 'accounts'];
         const unsubscribers = collectionsToFetch.map(colName => {
@@ -89,14 +96,39 @@ export default function App() {
         });
         const profileRef = doc(db, `artifacts/${appId}/users/${userId}/companyProfile`, 'main');
         const unsubProfile = onSnapshot(profileRef, async (docSnap) => {
-            if (docSnap.exists()) setData(prev => ({ ...prev, companyProfile: docSnap.data() }));
+            if (docSnap.exists()) {
+                setData(prev => ({ ...prev, companyProfile: docSnap.data() }));
+            } else {
+                const defaultProfile = { companyName: "Şirket Adınız", address: "Adresiniz", bankAccounts: [{ bankName: "Banka Adı", iban: "TR..." }] };
+                await setDoc(profileRef, defaultProfile);
+                setData(prev => ({ ...prev, companyProfile: defaultProfile }));
+            }
         });
         unsubscribers.push(unsubProfile);
         setLoading(false);
         return () => unsubscribers.forEach(unsub => unsub());
     }, [userId]);
 
-    if (loading || !userId) return <div className="flex items-center justify-center h-screen bg-slate-100"><div className="text-xl font-semibold">Yükleniyor...</div></div>;
+    if (authError) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-red-50 text-red-900 p-8">
+                <div className="text-center max-w-2xl">
+                    <AlertTriangle className="mx-auto h-12 w-12 text-red-400" />
+                    <h2 className="mt-4 text-2xl font-bold">Yapılandırma Hatası</h2>
+                    <p className="mt-2">{authError}</p>
+                    <p className="mt-4 text-sm text-red-700">Bu ayarı yaptıktan sonra sayfayı yenilemeniz gerekmektedir.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return <div className="flex items-center justify-center h-screen bg-slate-100"><div className="text-xl font-semibold">Yükleniyor...</div></div>;
+    }
+    
+    if (!userId) {
+         return <div className="flex items-center justify-center h-screen bg-slate-100"><div className="text-xl font-semibold">Kimlik doğrulama bekleniyor...</div></div>;
+    }
 
     const renderPage = () => {
         const { invoices, expenses, customers, products, accounts, companyProfile } = data;
@@ -114,85 +146,14 @@ export default function App() {
     return (<div className="flex h-screen bg-slate-100 font-sans"><Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} userId={userId} /><main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main></div>);
 }
 
-// Sidebar, Dashboard, StatCard... (These components remain the same)
+// --- Other Components ---
 const Sidebar = ({ currentPage, setCurrentPage, userId }) => { const navItems = [{ id: 'dashboard', label: 'Gösterge Paneli', icon: LayoutDashboard },{ id: 'invoices', label: 'Faturalar', icon: Receipt },{ id: 'expenses', label: 'Giderler', icon: ShoppingCart },{ id: 'customers', label: 'Cari Hesaplar', icon: Users },{ id: 'products', label: 'Ürün/Hizmetler', icon: Package },{ id: 'accounts', label: 'Kasa/Banka', icon: Landmark },{ id: 'reports', label: 'Raporlar', icon: BarChart3 },{ id: 'settings', label: 'Ayarlar', icon: Settings }]; return (<nav className="w-16 md:w-64 bg-slate-900 text-white flex flex-col no-print"><div className="flex items-center justify-center md:justify-start p-4 border-b border-slate-700"><span className="text-xl font-bold text-sky-400">S</span><h1 className="hidden md:block text-xl font-bold ml-2">SAGG Muhasebe</h1></div><ul className="flex-1 mt-4">{navItems.map(item => (<li key={item.id} className="my-1"><button onClick={() => setCurrentPage(item.id)} className={`flex items-center w-full p-4 text-sm md:text-base hover:bg-slate-700 ${currentPage===item.id?'bg-sky-600/30 border-l-4 border-sky-400 text-sky-300':'text-slate-300'}`}><item.icon className="h-6 w-6 md:mr-3"/><span className="hidden md:inline">{item.label}</span></button></li>))}</ul><div className="p-2 border-t border-slate-700 text-center"><p className="text-xs text-slate-400 break-words">Kullanıcı ID: {userId}</p></div></nav>); };
 const Dashboard = ({ invoices, expenses, customers, products }) => { const { totalIncome, totalExpense } = useMemo(() => ({ totalIncome: (invoices || []).reduce((s, i) => s + i.grandTotal, 0), totalExpense: (expenses || []).reduce((s, e) => s + e.amount, 0), }), [invoices, expenses]); const chartData = [ { name: 'Gelir', Tutar: totalIncome }, { name: 'Gider', Tutar: totalExpense } ]; return (<div><h2 className="text-2xl font-bold text-slate-800 mb-6">Gösterge Paneli</h2><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"><StatCard title="Toplam Gelir" value={formatCurrency(totalIncome)} color="text-green-500" /><StatCard title="Toplam Gider" value={formatCurrency(totalExpense)} color="text-red-500" /><StatCard title="Toplam Cari" value={(customers || []).length} color="text-blue-500" /><StatCard title="Ürün/Hizmet Sayısı" value={(products || []).length} color="text-purple-500" /></div><div className="mt-8 bg-white p-6 rounded-lg shadow-md"><h3 className="text-lg font-semibold text-slate-700 mb-4">Gelir & Gider Analizi</h3><ResponsiveContainer width="100%" height={300}><BarChart data={chartData} margin={{ top: 5, right: 20, left: 30, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis tickFormatter={(v) => `${(v/1000).toFixed(0)}k`}/><Tooltip formatter={(v) => formatCurrency(v)} /><Legend /><Bar dataKey="Tutar" fill="#38bdf8" /></BarChart></ResponsiveContainer></div></div>); };
 const StatCard = ({ title, value, color }) => (<div className="bg-white p-6 rounded-lg shadow-md"><h4 className="text-sm font-semibold text-slate-500">{title}</h4><p className={`text-3xl font-bold mt-2 ${color}`}>{value}</p></div>);
-
-const Invoices = ({ invoices, userId, customers, products, companyProfile, scriptsLoaded }) => {
-    const [modalOpen, setModalOpen] = useState(false);
-    const [editingInvoice, setEditingInvoice] = useState(null);
-    const [viewingInvoice, setViewingInvoice] = useState(null);
-    const [invoiceForPdf, setInvoiceForPdf] = useState(null);
-    const [activeActionMenu, setActiveActionMenu] = useState(null);
-    const menuRef = useRef(null);
-    const printRef = useRef(null);
-
-    const handleEdit = (invoice) => { setEditingInvoice(invoice); setModalOpen(true); setActiveActionMenu(null); };
-    const handleAddNew = () => { setEditingInvoice(null); setModalOpen(true); };
-    const handleShare = (invoice) => {
-        if (!scriptsLoaded) { alert("Paylaşım için gerekli kütüphaneler yükleniyor, lütfen birkaç saniye sonra tekrar deneyin."); return; }
-        setInvoiceForPdf(invoice);
-        setActiveActionMenu(null);
-    };
-    
-    useEffect(() => {
-        if (invoiceForPdf && printRef.current) {
-            const generateAndShare = async () => {
-                try {
-                    const { jsPDF } = window.jspdf;
-                    const canvas = await window.html2canvas(printRef.current, { scale: 2 });
-                    const imgData = canvas.toDataURL('image/png');
-                    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = pdf.internal.pageSize.getHeight();
-                    const imgWidth = canvas.width; const imgHeight = canvas.height;
-                    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-                    const imgX = (pdfWidth - imgWidth * ratio) / 2;
-                    pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
-                    const pdfBlob = pdf.output('blob');
-                    const file = new File([pdfBlob], `fatura-${invoiceForPdf.invoiceNumber}.pdf`, { type: 'application/pdf' });
-
-                    if (navigator.share && navigator.canShare({ files: [file] })) {
-                        await navigator.share({ files: [file], title: `Fatura: ${invoiceForPdf.invoiceNumber}`, text: `SAGG Muhasebe Faturası` });
-                    } else {
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(file);
-                        link.download = `fatura-${invoiceForPdf.invoiceNumber}.pdf`;
-                        link.click();
-                        URL.revokeObjectURL(link.href);
-                        alert("Tarayıcınız paylaşımı desteklemiyor. Fatura PDF olarak indirildi.");
-                    }
-                } catch (err) { alert('Fatura PDF olarak oluşturulurken bir hata oluştu.'); console.error(err); } 
-                finally { setInvoiceForPdf(null); }
-            };
-            generateAndShare();
-        }
-    }, [invoiceForPdf]);
-
-    useEffect(() => {
-        const handleClickOutside = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setActiveActionMenu(null); };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    return (
-        <div>
-            <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-slate-800">Faturalar</h2><button onClick={handleAddNew} className="flex items-center bg-sky-500 text-white px-4 py-2 rounded-lg shadow hover:bg-sky-600"><PlusCircle className="h-5 w-5 mr-2"/>Yeni Fatura Oluştur</button></div>
-            <div className="bg-white p-4 rounded-lg shadow-md"><div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="p-3">Fatura No</th><th className="p-3">Müşteri</th><th className="p-3">Tarih</th><th className="p-3">Tutar</th><th className="p-3 text-center">İşlemler</th></tr></thead><tbody>{(invoices || []).map(inv => (<tr key={inv.id} className="border-b hover:bg-slate-100 cursor-pointer" onClick={() => setViewingInvoice(inv)}><td className="p-3">{inv.invoiceNumber}</td><td className="p-3">{inv.customerSnapshot?.name}</td><td className="p-3">{formatDate(inv.date)}</td><td className="p-3 font-semibold">{formatCurrency(inv.grandTotal)}</td><td className="p-3 text-center relative"><button onClick={(e) => { e.stopPropagation(); setActiveActionMenu(inv.id === activeActionMenu ? null : inv.id);}} className="p-2 rounded-full hover:bg-slate-200"><MoreVertical size={20}/></button>{activeActionMenu === inv.id && (<div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 text-left"><div className="py-1"><a href="#" onClick={(e) => {e.stopPropagation(); handleEdit(inv)}} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Edit size={16} className="mr-3"/>Düzenle</a><a href="#" onClick={(e) => {e.stopPropagation(); handleShare(inv)}} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Send size={16} className="mr-3"/>Gönder/Paylaş</a></div></div>)}</td></tr>))}</tbody></table></div></div>
-            {(modalOpen || editingInvoice) && <InvoiceModal setShowModal={setModalOpen} userId={userId} customers={customers} products={products} editingInvoice={editingInvoice} setEditingInvoice={setEditingInvoice}/>}
-            {viewingInvoice && <InvoicePrintView invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} companyProfile={companyProfile}/>}
-            {invoiceForPdf && <div className="fixed left-[-9999px] top-0"><InvoicePrintView ref={printRef} invoice={invoiceForPdf} companyProfile={companyProfile} /></div>}
-        </div>
-    );
-};
-
-const InvoiceModal = ({ setShowModal, userId, customers, products, editingInvoice, setEditingInvoice }) => { /* ... (same as before) ... */ const [form, setForm] = useState({ customerId: '', invoiceNumber: '', date: new Date().toISOString().split('T')[0], items: [{ productId: '', description: '', quantity: 1, unitPrice: 0 }], kdvRate: 20 }); useEffect(() => { if (editingInvoice) { const date = editingInvoice.date?.toDate ? editingInvoice.date.toDate() : new Date(); setForm({ ...editingInvoice, date: date.toISOString().split('T')[0] }); } }, [editingInvoice]); const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value }); const handleItemChange = (index, field, value) => { const newItems = [...form.items]; newItems[index][field] = value; if (field === 'productId' && value) { const product = products.find(p => p.id === value); if (product) { newItems[index].description = product.name; newItems[index].unitPrice = product.price; } } setForm({...form, items: newItems}); }; const addItem = () => setForm({...form, items: [...form.items, { productId: '', description: '', quantity: 1, unitPrice: 0 }]}); const removeItem = (index) => setForm({...form, items: form.items.filter((_, i) => i !== index)}); const subTotal = useMemo(() => form.items.reduce((s, i) => s + (i.quantity * i.unitPrice || 0), 0), [form.items]); const kdvAmount = useMemo(() => subTotal * (form.kdvRate / 100), [subTotal, form.kdvRate]); const grandTotal = useMemo(() => subTotal + kdvAmount, [subTotal, kdvAmount]); const handleSubmit = async (e) => { e.preventDefault(); const selectedCustomer = customers.find(c => c.id === form.customerId); if (!selectedCustomer || !form.invoiceNumber) { alert("Lütfen müşteri ve fatura numarası girin."); return; } const dataToSave = { ...form, date: Timestamp.fromDate(new Date(form.date)), customerSnapshot: selectedCustomer, subTotal, kdvAmount, grandTotal }; try { if (editingInvoice) { const docRef = doc(db, `artifacts/${appId}/users/${userId}/invoices`, editingInvoice.id); await updateDoc(docRef, dataToSave); } else { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/invoices`), dataToSave); } setShowModal(false); setEditingInvoice(null); } catch (error) { console.error("Fatura kaydedilirken hata:", error); } }; return (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"><form onSubmit={handleSubmit}><div className="p-6 border-b flex justify-between items-center"><h3 className="text-xl font-semibold text-slate-800">{editingInvoice?'Fatura Düzenle':'Yeni Fatura'}</h3><button type="button" onClick={()=>{setShowModal(false); setEditingInvoice(null)}} className="text-slate-500 hover:text-slate-800"><X/></button></div><div className="p-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><select name="customerId" value={form.customerId} onChange={handleChange} className="p-2 border rounded bg-white" required><option value="" disabled>Müşteri Seçin</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><input type="text" name="invoiceNumber" placeholder="Fatura Numarası" value={form.invoiceNumber} onChange={handleChange} className="p-2 border rounded" required /><input type="date" name="date" value={form.date} onChange={handleChange} className="p-2 border rounded" required /><select name="kdvRate" value={form.kdvRate} onChange={handleChange} className="p-2 border rounded bg-white"><option value="1">KDV %1</option><option value="10">KDV %10</option><option value="20">KDV %20</option></select></div><h4 className="font-semibold mt-6 mb-2">Fatura Kalemleri</h4>{form.items.map((item, index) => (<div key={index} className="grid grid-cols-12 gap-2 mb-2 items-center"><select value={item.productId} onChange={e => handleItemChange(index, 'productId', e.target.value)} className="col-span-4 p-2 border rounded bg-white"><option value="">Ürün/Hizmet Seç</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><input type="number" placeholder="Miktar" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', Number(e.target.value))} className="col-span-2 p-2 border rounded" required /><input type="number" step="0.01" placeholder="Birim Fiyat" value={item.unitPrice} onChange={e => handleItemChange(index, 'unitPrice', Number(e.target.value))} className="col-span-3 p-2 border rounded" required /><span className="col-span-2 p-2 text-right">{formatCurrency(item.quantity * item.unitPrice)}</span><button type="button" onClick={() => removeItem(index)} className="col-span-1 text-red-500 hover:text-red-700"><X size={18}/></button></div>))}<button type="button" onClick={addItem} className="text-sm text-sky-600 hover:text-sky-800 mt-2">+ Kalem Ekle</button><div className="mt-6 border-t pt-4 text-right"><p className="text-slate-600">Ara Toplam: <span className="font-semibold">{formatCurrency(subTotal)}</span></p><p className="text-slate-600">KDV (%{form.kdvRate}): <span className="font-semibold">{formatCurrency(kdvAmount)}</span></p><p className="text-xl font-bold text-slate-800 mt-2">Genel Toplam: <span className="font-semibold">{formatCurrency(grandTotal)}</span></p></div></div><div className="p-4 bg-slate-50 border-t flex justify-end"><button type="button" onClick={()=>{setShowModal(false);setEditingInvoice(null)}} className="px-4 py-2 mr-2 bg-slate-200 rounded hover:bg-slate-300">İptal</button><button type="submit" className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-600">Kaydet</button></div></form></div></div>);};
-
+const Invoices = ({ invoices, userId, customers, products, companyProfile, scriptsLoaded }) => { const [modalOpen, setModalOpen] = useState(false); const [editingInvoice, setEditingInvoice] = useState(null); const [viewingInvoice, setViewingInvoice] = useState(null); const [invoiceForPdf, setInvoiceForPdf] = useState(null); const [activeActionMenu, setActiveActionMenu] = useState(null); const menuRef = useRef(null); const printRef = useRef(null); const handleEdit = (invoice) => { setEditingInvoice(invoice); setModalOpen(true); setActiveActionMenu(null); }; const handleAddNew = () => { setEditingInvoice(null); setModalOpen(true); }; const handleShare = (invoice) => { if (!scriptsLoaded) { alert("Paylaşım için gerekli kütüphaneler yükleniyor, lütfen birkaç saniye sonra tekrar deneyin."); return; } setInvoiceForPdf(invoice); setActiveActionMenu(null); }; useEffect(() => { if (invoiceForPdf && printRef.current) { const generateAndShare = async () => { try { const { jsPDF } = window.jspdf; const canvas = await window.html2canvas(printRef.current, { scale: 2 }); const imgData = canvas.toDataURL('image/png'); const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' }); const pdfWidth = pdf.internal.pageSize.getWidth(); const pdfHeight = pdf.internal.pageSize.getHeight(); const imgWidth = canvas.width; const imgHeight = canvas.height; const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight); const imgX = (pdfWidth - imgWidth * ratio) / 2; pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio); const pdfBlob = pdf.output('blob'); const file = new File([pdfBlob], `fatura-${invoiceForPdf.invoiceNumber}.pdf`, { type: 'application/pdf' }); if (navigator.share && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: `Fatura: ${invoiceForPdf.invoiceNumber}`, text: `SAGG Muhasebe Faturası` }); } else { const link = document.createElement('a'); link.href = URL.createObjectURL(file); link.download = `fatura-${invoiceForPdf.invoiceNumber}.pdf`; link.click(); URL.revokeObjectURL(link.href); alert("Tarayıcınız paylaşımı desteklemiyor. Fatura PDF olarak indirildi."); } } catch (err) { alert('Fatura PDF olarak oluşturulurken bir hata oluştu.'); console.error(err); } finally { setInvoiceForPdf(null); } }; generateAndShare(); } }, [invoiceForPdf]); useEffect(() => { const handleClickOutside = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setActiveActionMenu(null); }; document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside); }, []); return (<div><div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-slate-800">Faturalar</h2><button onClick={handleAddNew} className="flex items-center bg-sky-500 text-white px-4 py-2 rounded-lg shadow hover:bg-sky-600"><PlusCircle className="h-5 w-5 mr-2"/>Yeni Fatura Oluştur</button></div><div className="bg-white p-4 rounded-lg shadow-md"><div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="p-3">Fatura No</th><th className="p-3">Müşteri</th><th className="p-3">Tarih</th><th className="p-3">Tutar</th><th className="p-3 text-center">İşlemler</th></tr></thead><tbody>{(invoices || []).map(inv => (<tr key={inv.id} className="border-b hover:bg-slate-100 cursor-pointer" onClick={() => setViewingInvoice(inv)}><td className="p-3">{inv.invoiceNumber}</td><td className="p-3">{inv.customerSnapshot?.name}</td><td className="p-3">{formatDate(inv.date)}</td><td className="p-3 font-semibold">{formatCurrency(inv.grandTotal)}</td><td className="p-3 text-center relative"><button onClick={(e) => { e.stopPropagation(); setActiveActionMenu(inv.id === activeActionMenu ? null : inv.id);}} className="p-2 rounded-full hover:bg-slate-200"><MoreVertical size={20}/></button>{activeActionMenu === inv.id && (<div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 text-left"><div className="py-1"><a href="#" onClick={(e) => {e.stopPropagation(); handleEdit(inv)}} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Edit size={16} className="mr-3"/>Düzenle</a><a href="#" onClick={(e) => {e.stopPropagation(); handleShare(inv)}} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Send size={16} className="mr-3"/>Gönder/Paylaş</a></div></div>)}</td></tr>))}</tbody></table></div></div>{(modalOpen || editingInvoice) && <InvoiceModal setShowModal={setModalOpen} userId={userId} customers={customers} products={products} editingInvoice={editingInvoice} setEditingInvoice={setEditingInvoice}/>}{viewingInvoice && <InvoicePrintView invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} companyProfile={companyProfile}/>}{invoiceForPdf && <div className="fixed left-[-9999px] top-0"><InvoicePrintView ref={printRef} invoice={invoiceForPdf} companyProfile={companyProfile} /></div>}</div>); };
+const InvoiceModal = ({ setShowModal, userId, customers, products, editingInvoice, setEditingInvoice }) => { const [form, setForm] = useState({ customerId: '', invoiceNumber: '', date: new Date().toISOString().split('T')[0], items: [{ productId: '', description: '', quantity: 1, unitPrice: 0 }], kdvRate: 20 }); useEffect(() => { if (editingInvoice) { const date = editingInvoice.date?.toDate ? editingInvoice.date.toDate() : new Date(); setForm({ ...editingInvoice, date: date.toISOString().split('T')[0] }); } }, [editingInvoice]); const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value }); const handleItemChange = (index, field, value) => { const newItems = [...form.items]; newItems[index][field] = value; if (field === 'productId' && value) { const product = products.find(p => p.id === value); if (product) { newItems[index].description = product.name; newItems[index].unitPrice = product.price; } } setForm({...form, items: newItems}); }; const addItem = () => setForm({...form, items: [...form.items, { productId: '', description: '', quantity: 1, unitPrice: 0 }]}); const removeItem = (index) => setForm({...form, items: form.items.filter((_, i) => i !== index)}); const subTotal = useMemo(() => form.items.reduce((s, i) => s + (i.quantity * i.unitPrice || 0), 0), [form.items]); const kdvAmount = useMemo(() => subTotal * (form.kdvRate / 100), [subTotal, form.kdvRate]); const grandTotal = useMemo(() => subTotal + kdvAmount, [subTotal, kdvAmount]); const handleSubmit = async (e) => { e.preventDefault(); const selectedCustomer = customers.find(c => c.id === form.customerId); if (!selectedCustomer || !form.invoiceNumber) { alert("Lütfen müşteri ve fatura numarası girin."); return; } const dataToSave = { ...form, date: Timestamp.fromDate(new Date(form.date)), customerSnapshot: selectedCustomer, subTotal, kdvAmount, grandTotal }; try { if (editingInvoice) { const docRef = doc(db, `artifacts/${appId}/users/${userId}/invoices`, editingInvoice.id); await updateDoc(docRef, dataToSave); } else { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/invoices`), dataToSave); } setShowModal(false); setEditingInvoice(null); } catch (error) { console.error("Fatura kaydedilirken hata:", error); } }; return (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"><form onSubmit={handleSubmit}><div className="p-6 border-b flex justify-between items-center"><h3 className="text-xl font-semibold text-slate-800">{editingInvoice?'Fatura Düzenle':'Yeni Fatura'}</h3><button type="button" onClick={()=>{setShowModal(false); setEditingInvoice(null)}} className="text-slate-500 hover:text-slate-800"><X/></button></div><div className="p-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><select name="customerId" value={form.customerId} onChange={handleChange} className="p-2 border rounded bg-white" required><option value="" disabled>Müşteri Seçin</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><input type="text" name="invoiceNumber" placeholder="Fatura Numarası" value={form.invoiceNumber} onChange={handleChange} className="p-2 border rounded" required /><input type="date" name="date" value={form.date} onChange={handleChange} className="p-2 border rounded" required /><select name="kdvRate" value={form.kdvRate} onChange={handleChange} className="p-2 border rounded bg-white"><option value="1">KDV %1</option><option value="10">KDV %10</option><option value="20">KDV %20</option></select></div><h4 className="font-semibold mt-6 mb-2">Fatura Kalemleri</h4>{form.items.map((item, index) => (<div key={index} className="grid grid-cols-12 gap-2 mb-2 items-center"><select value={item.productId} onChange={e => handleItemChange(index, 'productId', e.target.value)} className="col-span-4 p-2 border rounded bg-white"><option value="">Ürün/Hizmet Seç</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><input type="number" placeholder="Miktar" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', Number(e.target.value))} className="col-span-2 p-2 border rounded" required /><input type="number" step="0.01" placeholder="Birim Fiyat" value={item.unitPrice} onChange={e => handleItemChange(index, 'unitPrice', Number(e.target.value))} className="col-span-3 p-2 border rounded" required /><span className="col-span-2 p-2 text-right">{formatCurrency(item.quantity * item.unitPrice)}</span><button type="button" onClick={() => removeItem(index)} className="col-span-1 text-red-500 hover:text-red-700"><X size={18}/></button></div>))}<button type="button" onClick={addItem} className="text-sm text-sky-600 hover:text-sky-800 mt-2">+ Kalem Ekle</button><div className="mt-6 border-t pt-4 text-right"><p className="text-slate-600">Ara Toplam: <span className="font-semibold">{formatCurrency(subTotal)}</span></p><p className="text-slate-600">KDV (%{form.kdvRate}): <span className="font-semibold">{formatCurrency(kdvAmount)}</span></p><p className="text-xl font-bold text-slate-800 mt-2">Genel Toplam: <span className="font-semibold">{formatCurrency(grandTotal)}</span></p></div></div><div className="p-4 bg-slate-50 border-t flex justify-end"><button type="button" onClick={()=>{setShowModal(false);setEditingInvoice(null)}} className="px-4 py-2 mr-2 bg-slate-200 rounded hover:bg-slate-300">İptal</button><button type="submit" className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-600">Kaydet</button></div></form></div></div>);};
 const InvoicePrintView = forwardRef(({ invoice, onClose, companyProfile }, ref) => { const printStyles = `@media print{body *{visibility:hidden}#invoice-print-area,#invoice-print-area *{visibility:visible}#invoice-print-area{position:absolute;left:0;top:0;width:100%}.no-print{display:none}}`; const handlePrint = () => window.print(); const { customerSnapshot } = invoice; return (<div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-start z-50 p-4 overflow-y-auto no-print"><style>{printStyles}</style><div className="bg-white w-full max-w-4xl shadow-2xl my-8"><div id="invoice-print-area" ref={ref} className="p-10 bg-white"><header className="flex justify-between items-start pb-6 border-b"><div><h1 className="text-3xl font-bold text-slate-800">{companyProfile?.companyName || "Şirket Adınız"}</h1><p className="text-slate-500 mt-2 max-w-xs">{companyProfile?.address || "Şirket Adresiniz"}</p></div><div className="text-right"><h2 className="text-4xl font-bold uppercase text-slate-400">Fatura</h2><p className="text-slate-500 mt-2">No: {invoice.invoiceNumber}</p></div></header><section className="flex justify-between mt-8"><div><h3 className="font-semibold text-slate-500 uppercase">Fatura Sahibi</h3><p className="font-bold text-slate-700 mt-1">{customerSnapshot?.name}</p><p className="text-slate-600 max-w-xs">{customerSnapshot?.address}</p>{customerSnapshot?.accountType === 'Tüzel Kişi' && (<><p className="text-slate-600">Vergi Dairesi: {customerSnapshot?.taxOffice}</p><p className="text-slate-600">VKN: {customerSnapshot?.taxId}</p></>)}{customerSnapshot?.accountType === 'Şahıs' && (<p className="text-slate-600">TCKN: {customerSnapshot?.tcNo}</p>)}</div><div className="text-right"><h3 className="font-semibold text-slate-500">Fatura Tarihi:</h3><p className="text-slate-600">{formatDate(invoice.date)}</p></div></section><section className="mt-8"><table className="w-full text-left"><thead className="bg-slate-100"><tr><th className="p-3 font-semibold uppercase text-slate-600">Açıklama</th><th className="p-3 font-semibold uppercase text-slate-600 text-right">Miktar</th><th className="p-3 font-semibold uppercase text-slate-600 text-right">Birim Fiyat</th><th className="p-3 font-semibold uppercase text-slate-600 text-right">Toplam</th></tr></thead><tbody>{invoice.items.map((item, i) => (<tr key={i} className="border-b"><td className="p-3">{item.description}</td><td className="p-3 text-right">{item.quantity}</td><td className="p-3 text-right">{formatCurrency(item.unitPrice)}</td><td className="p-3 text-right">{formatCurrency(item.quantity * item.unitPrice)}</td></tr>))}</tbody></table></section><section className="flex justify-end mt-8"><div className="w-full max-w-sm"><div className="flex justify-between text-slate-600"><p>Ara Toplam:</p><p>{formatCurrency(invoice.subTotal)}</p></div><div className="flex justify-between text-slate-600 mt-2"><p>KDV (%{invoice.kdvRate}):</p><p>{formatCurrency(invoice.kdvAmount)}</p></div><div className="flex justify-between font-bold text-xl text-slate-800 mt-4 border-t pt-2"><p>Genel Toplam:</p><p>{formatCurrency(invoice.grandTotal)}</p></div></div></section><section className="mt-8 border-t pt-4"><p className="text-xs text-slate-500">Yalnız: {numberToWordsTr(invoice.grandTotal)}</p></section><footer className="mt-10 border-t pt-4"><h3 className="font-semibold text-slate-500 uppercase mb-2">Banka Bilgileri</h3>{(companyProfile?.bankAccounts || []).map((acc,i)=>(<div key={i} className="text-sm text-slate-600"><p><span className="font-semibold">{acc.bankName}:</span> {acc.iban}</p></div>))}</footer></div><div className="p-4 bg-slate-50 flex justify-end space-x-2 no-print"><button onClick={onClose} className="px-4 py-2 bg-slate-300 text-slate-800 rounded hover:bg-slate-400">Kapat</button><button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-600"><Printer size={16} className="mr-2"/> Yazdır</button></div></div></div>); });
 InvoicePrintView.displayName = 'InvoicePrintView';
-
-// --- Other components (Customers, Products, Expenses, etc.) ---
 const FormModal = ({ title, children, onSubmit, setShowModal }) => ( <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-lg"><form onSubmit={onSubmit}><div className="p-6 border-b"><div className="flex justify-between items-center"><h3 className="text-xl font-semibold text-slate-800">{title}</h3><button type="button" onClick={() => setShowModal(false)} className="text-slate-500 hover:text-slate-800"><X /></button></div></div><div className="p-6">{children}</div><div className="p-4 bg-slate-50 border-t flex justify-end"><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 mr-2 bg-slate-200 rounded hover:bg-slate-300">İptal</button><button type="submit" className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-600">Kaydet</button></div></form></div></div>);
 const Customers = ({ customers, userId }) => { const [showModal, setShowModal] = useState(false); return (<div><div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-slate-800">Cari Hesaplar</h2><button onClick={() => setShowModal(true)} className="flex items-center bg-sky-500 text-white px-4 py-2 rounded-lg shadow hover:bg-sky-600 transition-colors"><PlusCircle className="h-5 w-5 mr-2" />Yeni Cari Ekle</button></div><div className="bg-white p-4 rounded-lg shadow-md"><div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="p-3">Adı</th><th className="p-3">Tipi</th><th className="p-3">Vergi/TCKN No</th><th className="p-3">Email</th></tr></thead><tbody>{(customers || []).map(c => (<tr key={c.id} className="border-b hover:bg-slate-50"><td className="p-3">{c.name}</td><td className="p-3">{c.accountType}</td><td className="p-3">{c.taxId || c.tcNo}</td><td className="p-3">{c.email}</td></tr>))}</tbody></table></div></div>{showModal && <CustomerModal setShowModal={setShowModal} userId={userId} />}</div>); };
 const CustomerModal = ({ setShowModal, userId }) => { const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', accountType: 'Tüzel Kişi', taxOffice: '', taxId: '', tcNo: '' }); const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value }); const handleSubmit = async (e) => { e.preventDefault(); if(!form.name) return; try { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/customers`), form); setShowModal(false); } catch (error) { console.error("Error creating customer:", error); } }; return (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-2xl"><form onSubmit={handleSubmit}><div className="p-6 border-b"><div className="flex justify-between items-center"><h3 className="text-xl font-semibold text-slate-800">Yeni Cari Hesap Ekle</h3><button type="button" onClick={() => setShowModal(false)} className="text-slate-500 hover:text-slate-800"><X /></button></div></div><div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4"><input type="text" name="name" placeholder="Adı Soyadı / Firma Adı" value={form.name} onChange={handleChange} className="p-2 border rounded md:col-span-2" required /><select name="accountType" value={form.accountType} onChange={handleChange} className="p-2 border rounded bg-white"><option value="Tüzel Kişi">Tüzel Kişi</option><option value="Şahıs">Şahıs</option></select><div></div>{form.accountType === 'Tüzel Kişi' ? (<><input type="text" name="taxOffice" placeholder="Vergi Dairesi" value={form.taxOffice} onChange={handleChange} className="p-2 border rounded" /><input type="text" name="taxId" placeholder="Vergi Kimlik No (VKN)" value={form.taxId} onChange={handleChange} className="p-2 border rounded" /></>) : (<><input type="text" name="tcNo" placeholder="T.C. Kimlik No" value={form.tcNo} onChange={handleChange} className="p-2 border rounded md:col-span-2" /></>)}<input type="email" name="email" placeholder="E-posta" value={form.email} onChange={handleChange} className="p-2 border rounded" /><input type="tel" name="phone" placeholder="Telefon" value={form.phone} onChange={handleChange} className="p-2 border rounded" /><textarea name="address" placeholder="Adres" value={form.address} onChange={handleChange} className="p-2 border rounded md:col-span-2 h-24" required></textarea></div><div className="p-4 bg-slate-50 border-t flex justify-end"><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 mr-2 bg-slate-200 rounded hover:bg-slate-300">İptal</button><button type="submit" className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-600">Kaydet</button></div></form></div></div>); };
