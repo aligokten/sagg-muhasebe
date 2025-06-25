@@ -7,11 +7,27 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, query, Timestamp, setDoc, updateDoc } from 'firebase/firestore';
 
-// --- Firebase Configuration ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-    ? JSON.parse(__firebase_config) 
-    : { apiKey: "your-fallback-api-key", authDomain: "...", projectId: "..." };
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyB3UzsOhB0u8kvha-kPioQX6YYRrOhEAvk",
+  authDomain: "sagg-muhasebe.firebaseapp.com",
+  projectId: "sagg-muhasebe",
+  storageBucket: "sagg-muhasebe.firebasestorage.app",
+  messagingSenderId: "453864948612",
+  appId: "1:453864948612:web:5736e59e08a10d524353d1",
+  measurementId: "G-PM7WXNEQG9"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-sagg-muhasebe';
 
 // --- App Initialization ---
