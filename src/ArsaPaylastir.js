@@ -483,6 +483,8 @@ export default function ArsaPaylastir() {
   const [tkgmParsel, setTkgmParsel] = useState("");
   const [tkgmBusy, setTkgmBusy] = useState(false);
   const [tkgmError, setTkgmError] = useState("");
+  const [tkgmDistrictsLoading, setTkgmDistrictsLoading] = useState(false);
+  const [tkgmNeighborhoodsLoading, setTkgmNeighborhoodsLoading] = useState(false);
 
   const svgRef = useRef(null);
 
@@ -514,15 +516,25 @@ export default function ArsaPaylastir() {
     setTkgmNeighborhoods([]);
     setTkgmError("");
     if (!id) return;
+    setTkgmDistrictsLoading(true);
     try {
       const res = await fetch(`${TKGM_API}idariYapi/ilceListe/${id}`);
+      if (!res.ok) {
+        setTkgmError(`İlçe listesi alınamadı (HTTP ${res.status}).`);
+        return;
+      }
       const data = await res.json();
       const list = (data.features || [])
         .map((f) => f.properties)
         .sort((a, b) => a.text.localeCompare(b.text, "tr"));
+      if (list.length === 0) {
+        setTkgmError("İlçe listesi boş geldi. Tekrar deneyin.");
+      }
       setTkgmDistricts(list);
-    } catch {
-      setTkgmError("İlçe listesi alınamadı. İnternet bağlantınızı kontrol edin.");
+    } catch (e) {
+      setTkgmError(`İlçe listesi alınamadı: ${e.message || "bilinmeyen hata"}.`);
+    } finally {
+      setTkgmDistrictsLoading(false);
     }
   }
 
@@ -532,15 +544,25 @@ export default function ArsaPaylastir() {
     setTkgmNeighborhoods([]);
     setTkgmError("");
     if (!id) return;
+    setTkgmNeighborhoodsLoading(true);
     try {
       const res = await fetch(`${TKGM_API}idariYapi/mahalleListe/${id}`);
+      if (!res.ok) {
+        setTkgmError(`Mahalle listesi alınamadı (HTTP ${res.status}).`);
+        return;
+      }
       const data = await res.json();
       const list = (data.features || [])
         .map((f) => f.properties)
         .sort((a, b) => a.text.localeCompare(b.text, "tr"));
+      if (list.length === 0) {
+        setTkgmError("Mahalle listesi boş geldi. Tekrar deneyin.");
+      }
       setTkgmNeighborhoods(list);
-    } catch {
-      setTkgmError("Mahalle listesi alınamadı. İnternet bağlantınızı kontrol edin.");
+    } catch (e) {
+      setTkgmError(`Mahalle listesi alınamadı: ${e.message || "bilinmeyen hata"}.`);
+    } finally {
+      setTkgmNeighborhoodsLoading(false);
     }
   }
 
@@ -835,14 +857,14 @@ export default function ArsaPaylastir() {
                     <option key={p.id} value={p.id}>{p.text}</option>
                   ))}
                 </select>
-                <select value={tkgmDistrictId} onChange={(e) => handleDistrictChange(e.target.value)} disabled={!tkgmProvinceId} style={selectStyle}>
-                  <option value="">İlçe seçin</option>
+                <select value={tkgmDistrictId} onChange={(e) => handleDistrictChange(e.target.value)} disabled={!tkgmProvinceId || tkgmDistrictsLoading} style={selectStyle}>
+                  <option value="">{tkgmDistrictsLoading ? "İlçeler yükleniyor…" : "İlçe seçin"}</option>
                   {tkgmDistricts.map((d) => (
                     <option key={d.id} value={d.id}>{d.text}</option>
                   ))}
                 </select>
-                <select value={tkgmNeighborhoodId} onChange={(e) => setTkgmNeighborhoodId(e.target.value)} disabled={!tkgmDistrictId} style={selectStyle}>
-                  <option value="">Mahalle seçin</option>
+                <select value={tkgmNeighborhoodId} onChange={(e) => setTkgmNeighborhoodId(e.target.value)} disabled={!tkgmDistrictId || tkgmNeighborhoodsLoading} style={selectStyle}>
+                  <option value="">{tkgmNeighborhoodsLoading ? "Mahalleler yükleniyor…" : "Mahalle seçin"}</option>
                   {tkgmNeighborhoods.map((m) => (
                     <option key={m.id} value={m.id}>{m.text}</option>
                   ))}
