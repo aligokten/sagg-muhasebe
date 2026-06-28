@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from "react";
+import JSZip from "jszip";
 import ilListe from "./ilListe.json";
 
 const TKGM_API = "https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api/";
@@ -486,6 +487,10 @@ export default function ArsaPaylastir() {
   const [tkgmDistrictsLoading, setTkgmDistrictsLoading] = useState(false);
   const [tkgmNeighborhoodsLoading, setTkgmNeighborhoodsLoading] = useState(false);
 
+  const [milasParselId, setMilasParselId] = useState("");
+  const [milasBusy, setMilasBusy] = useState(false);
+  const [milasError, setMilasError] = useState("");
+
   const svgRef = useRef(null);
 
   const totalArea = useMemo(() => (polygon.length >= 3 ? areaOf(polygon) : 0), [polygon]);
@@ -617,6 +622,66 @@ export default function ArsaPaylastir() {
       setTkgmError("TKGM sunucusuna bağlanılamadı. İnternet bağlantınızı kontrol edin.");
     } finally {
       setTkgmBusy(false);
+    }
+  }
+
+  async function fetchMilasParcel() {
+    const parselId = milasParselId.trim();
+    if (!parselId) {
+      setMilasError("Parsel ID girin (Milas e-imar sorgu sayfasındaki parselid değeri).");
+      return;
+    }
+    setMilasBusy(true);
+    setMilasError("");
+    try {
+      const imarUrl = `http://keos.milas.bel.tr/imardurumu/imar.aspx?parselid=${encodeURIComponent(parselId)}`;
+      const imarRes = await fetch(imarUrl, { referrerPolicy: "no-referrer" });
+      if (!imarRes.ok) {
+        setMilasError(`İmar durumu alınamadı (HTTP ${imarRes.status}).`);
+        return;
+      }
+      const html = await imarRes.text();
+      const tokenMatch = html.match(/kml\.ashx\?token=([0-9a-fA-F-]{36})/);
+      if (!tokenMatch) {
+        setMilasError("Bu parsel için KML linki bulunamadı. Parsel ID'yi kontrol edin.");
+        return;
+      }
+      const kmlUrl = `http://keos.milas.bel.tr/imardurumu/service/kml.ashx?token=${tokenMatch[1]}`;
+      const kmzRes = await fetch(kmlUrl, { referrerPolicy: "no-referrer" });
+      if (!kmzRes.ok) {
+        setMilasError(`KML dosyası alınamadı (HTTP ${kmzRes.status}).`);
+        return;
+      }
+      const kmzBuffer = await kmzRes.arrayBuffer();
+      const zip = await JSZip.loadAsync(kmzBuffer);
+      const kmlEntry = Object.values(zip.files).find((f) => f.name.toLowerCase().endsWith(".kml"));
+      if (!kmlEntry) {
+        setMilasError("KML dosyası içinde geometri bulunamadı.");
+        return;
+      }
+      const kmlText = await kmlEntry.async("text");
+      const coordMatch = kmlText.match(/<coordinates>([\s\S]*?)<\/coordinates>/);
+      if (!coordMatch) {
+        setMilasError("KML içinde koordinat bilgisi bulunamadı.");
+        return;
+      }
+      const triples = coordMatch[1].trim().split(/\s+/).filter(Boolean);
+      const pts = triples.map((t) => {
+        const [lon, lat] = t.split(",");
+        return [parseFloat(lon), parseFloat(lat)];
+      });
+      if (pts.length < 3) {
+        setMilasError("Parsel geometrisi okunamadı.");
+        return;
+      }
+      const first = pts[0], lastP = pts[pts.length - 1];
+      if (pts.length > 1 && first[0] === lastP[0] && first[1] === lastP[1]) pts.pop();
+      const text = pts.map(([lon, lat]) => `${lon},${lat}`).join("\n");
+      applyPointsText(text);
+    } catch {
+      setMilasError("Milas e-imar sunucusuna bağlanılamadı. İnternet bağlantınızı kontrol edin.");
+    } finally {
+      setMilasBusy(false);
     }
   }
 
@@ -878,6 +943,20 @@ export default function ArsaPaylastir() {
                 {tkgmBusy ? "Sorgulanıyor…" : "Parsel Bul"}
               </button>
               {tkgmError && <div style={{ fontSize: 12, color: ACCENT }}>{tkgmError}</div>}
+            </div>
+
+            <div style={{ border: `1px solid ${RULE}`, background: "#fff", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: "#6b675c" }}>
+                MİLAS BELEDİYESİ E-İMAR (KEOS)
+              </div>
+              <div style={{ fontSize: 11.5, color: "#9a9686" }}>
+                Parsel ID'yi Milas e-imar sorgu sayfasından (keos.milas.bel.tr/imardurumu) alıp girin.
+              </div>
+              <input placeholder="Parsel ID (örn. 173293)" value={milasParselId} onChange={(e) => setMilasParselId(e.target.value)} style={selectStyle} />
+              <button onClick={fetchMilasParcel} disabled={milasBusy || !milasParselId.trim()} style={btnGhost}>
+                {milasBusy ? "Sorgulanıyor…" : "Parsel Bul"}
+              </button>
+              {milasError && <div style={{ fontSize: 12, color: ACCENT }}>{milasError}</div>}
             </div>
 
             <Field label="Koordinatlar (x,y — her satır bir köşe)">
