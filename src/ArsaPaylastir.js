@@ -288,6 +288,31 @@ function generatePiecesAuto(poly, n, minRaw, stepDeg) {
   return null;
 }
 
+// uFixed: referans çizginin yön vektörü (birim). Kesim çizgileri bu doğrultuya
+// dik olacak şekilde, parsel sırayla eşit alanlı şeritlere bölünür.
+function generatePiecesFixedDirection(poly, n, minRaw, uFixed) {
+  const total = areaOf(poly);
+  const target = total / n;
+  let remain = cleanPoly(poly);
+  const pieces = [];
+  let ok = true;
+  for (let i = 1; i < n && ok; i++) {
+    const restFinal = i === n - 1;
+    const cand = tryCut(remain, target, uFixed, minRaw, restFinal);
+    if (cand) {
+      pieces.push(cand.piece);
+      remain = cand.rest;
+    } else {
+      ok = false;
+    }
+  }
+  if (ok && validFinalPieceP(remain, remain, minRaw)) {
+    pieces.push(remain);
+    return pieces;
+  }
+  return null;
+}
+
 /* =========================================================
    DXF ÜRETİMİ (R12 ASCII)
    ========================================================= */
@@ -441,6 +466,11 @@ export default function ArsaPaylastir() {
   const [drawMode, setDrawMode] = useState(false);
   const [drawPts, setDrawPts] = useState([]);
 
+  const [refMode, setRefMode] = useState(false);
+  const [refClickPts, setRefClickPts] = useState([]);
+  const [refLine, setRefLine] = useState(null);
+  const [useRefDirection, setUseRefDirection] = useState(false);
+
   const svgRef = useRef(null);
 
   const totalArea = useMemo(() => (polygon.length >= 3 ? areaOf(polygon) : 0), [polygon]);
@@ -459,6 +489,8 @@ export default function ArsaPaylastir() {
     if (geo) setUnitM(1);
     setPieces(null);
     setStatus("idle");
+    setRefLine(null);
+    setUseRefDirection(false);
   }
 
   function runSplit() {
@@ -467,11 +499,23 @@ export default function ArsaPaylastir() {
     setErrorMsg("");
     setTimeout(() => {
       const minRaw = minM > 0 ? minM / unitM : 0;
-      const result = generatePiecesAuto(polygon, n, minRaw, stepDeg);
+      let result = null;
+      if (useRefDirection && refLine) {
+        const v = sub(refLine[1], refLine[0]);
+        const vlen = len(v);
+        if (vlen > EPS) {
+          const uFixed = [v[0] / vlen, v[1] / vlen];
+          result = generatePiecesFixedDirection(polygon, n, minRaw, uFixed);
+        }
+      } else {
+        result = generatePiecesAuto(polygon, n, minRaw, stepDeg);
+      }
       if (!result) {
         setStatus("error");
         setErrorMsg(
-          "Bu geometri ve kriterlerle güvenli bölme bulunamadı. Minimum kenar değerini düşürün, parça sayısını azaltın veya arama hassasiyetini 2-3°'ye çekip tekrar deneyin."
+          useRefDirection && refLine
+            ? "Referans çizgisine dik kesimlerle güvenli bölme bulunamadı. Minimum kenar değerini düşürün, parça sayısını azaltın veya referans çizgisini farklı çizip tekrar deneyin."
+            : "Bu geometri ve kriterlerle güvenli bölme bulunamadı. Minimum kenar değerini düşürün, parça sayısını azaltın veya arama hassasiyetini 2-3°'ye çekip tekrar deneyin."
         );
         setPieces(null);
       } else {
@@ -520,13 +564,31 @@ export default function ArsaPaylastir() {
     return [sx, sy];
   }
 
+  function fromSvg([sx, sy]) {
+    const x = bounds.minx + (sx - PAD) / bounds.scale;
+    const y = bounds.miny + (VB - PAD - sy) / bounds.scale;
+    return [x, y];
+  }
+
   function handleSvgClick(e) {
-    if (!drawMode) return;
+    if (!drawMode && !refMode) return;
     const svg = svgRef.current;
     const rect = svg.getBoundingClientRect();
     const sx = ((e.clientX - rect.left) / rect.width) * VB;
     const sy = ((e.clientY - rect.top) / rect.height) * VB;
-    setDrawPts((prev) => [...prev, [sx, sy]]);
+    if (drawMode) {
+      setDrawPts((prev) => [...prev, [sx, sy]]);
+      return;
+    }
+    setRefClickPts((prev) => {
+      const next = [...prev, [sx, sy]];
+      if (next.length >= 2) {
+        setRefLine(next.map(fromSvg));
+        setRefMode(false);
+        return [];
+      }
+      return next;
+    });
   }
 
   function finishDrawing() {
@@ -573,9 +635,9 @@ export default function ArsaPaylastir() {
           <div style={{ border: `1px solid ${RULE}`, background: "#fff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: `1px solid ${RULE}`, fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: "#6b675c" }}>
               <span>SINIR GÖRÜNÜMÜ</span>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {!drawMode ? (
-                  <button onClick={() => { setDrawMode(true); setDrawPts([]); setPieces(null); setStatus("idle"); }} style={btnGhost}>
+                  <button onClick={() => { setDrawMode(true); setDrawPts([]); setPieces(null); setStatus("idle"); }} style={btnGhost} disabled={refMode}>
                     Tıklayarak Çiz
                   </button>
                 ) : (
@@ -587,6 +649,20 @@ export default function ArsaPaylastir() {
                       Vazgeç
                     </button>
                   </>
+                )}
+                {!refMode ? (
+                  <button onClick={() => { setRefMode(true); setRefClickPts([]); setPieces(null); setStatus("idle"); }} style={btnGhost} disabled={drawMode}>
+                    Referans Çizgisi Çiz
+                  </button>
+                ) : (
+                  <button onClick={() => { setRefMode(false); setRefClickPts([]); }} style={btnGhost}>
+                    Vazgeç ({refClickPts.length}/2)
+                  </button>
+                )}
+                {refLine && (
+                  <button onClick={() => { setRefLine(null); setUseRefDirection(false); }} style={btnGhost}>
+                    Referansı Temizle
+                  </button>
                 )}
               </div>
             </div>
@@ -630,6 +706,15 @@ export default function ArsaPaylastir() {
               {drawMode && drawPts.length > 2 && (
                 <line x1={drawPts[drawPts.length - 1][0]} y1={drawPts[drawPts.length - 1][1]} x2={drawPts[0][0]} y2={drawPts[0][1]} stroke={ACCENT} strokeDasharray="3 3" strokeWidth={1} />
               )}
+
+              {refMode && refClickPts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={3.5} fill="#eab308" />)}
+              {refLine && (
+                <line
+                  x1={toSvg(refLine[0])[0]} y1={toSvg(refLine[0])[1]}
+                  x2={toSvg(refLine[1])[0]} y2={toSvg(refLine[1])[1]}
+                  stroke="#eab308" strokeWidth={2.5}
+                />
+              )}
             </svg>
           </div>
 
@@ -650,6 +735,16 @@ export default function ArsaPaylastir() {
               <Field label="Min. kenar (m, 0=yok)"><NumberInput value={minM} onChange={setMinM} min={0} step={1} /></Field>
               <Field label="Arama hassasiyeti (°)"><NumberInput value={stepDeg} onChange={setStepDeg} min={1} max={45} step={1} /></Field>
             </div>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: refLine ? INK : "#aba795", cursor: refLine ? "pointer" : "not-allowed" }}>
+              <input
+                type="checkbox"
+                checked={useRefDirection}
+                disabled={!refLine}
+                onChange={(e) => setUseRefDirection(e.target.checked)}
+              />
+              Referans çizgisine dik kesimler kullan (şeritler çizgiye paralel)
+            </label>
 
             <div style={{ fontSize: 12, color: "#6b675c", fontFamily: FONT_DISPLAY }}>
               Toplam alan: <b style={{ color: INK }}>{(totalArea * unitM * unitM).toFixed(2)} m²</b>
