@@ -3,6 +3,11 @@ import JSZip from "jszip";
 import ilListe from "./ilListe.json";
 
 const TKGM_API = "https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api/";
+// Milas Belediyesi KEOS e-imar sistemi sadece http destekliyor (https sertifikası yok).
+// https sayfalardan mixed-content engelini aşmak için bir Cloudflare Worker proxy
+// kullanılıyor (bkz. docs/milas-proxy-worker.js). Kendi worker adresinizi deploy
+// ettikten sonra buraya yazın.
+const MILAS_PROXY_BASE = "https://REPLACE-WITH-YOUR-WORKER.workers.dev";
 
 /* =========================================================
    GEOMETRİ ÇEKİRDEĞİ
@@ -631,10 +636,14 @@ export default function ArsaPaylastir() {
       setMilasError("Parsel ID girin (Milas e-imar sorgu sayfasındaki parselid değeri).");
       return;
     }
+    if (MILAS_PROXY_BASE.includes("REPLACE-WITH-YOUR-WORKER")) {
+      setMilasError("Milas proxy adresi henüz ayarlanmadı (MILAS_PROXY_BASE).");
+      return;
+    }
     setMilasBusy(true);
     setMilasError("");
     try {
-      const imarUrl = `http://keos.milas.bel.tr/imardurumu/imar.aspx?parselid=${encodeURIComponent(parselId)}`;
+      const imarUrl = `${MILAS_PROXY_BASE}/imar?parselid=${encodeURIComponent(parselId)}`;
       const imarRes = await fetch(imarUrl, { referrerPolicy: "no-referrer" });
       if (!imarRes.ok) {
         setMilasError(`İmar durumu alınamadı (HTTP ${imarRes.status}).`);
@@ -646,7 +655,7 @@ export default function ArsaPaylastir() {
         setMilasError("Bu parsel için KML linki bulunamadı. Parsel ID'yi kontrol edin.");
         return;
       }
-      const kmlUrl = `http://keos.milas.bel.tr/imardurumu/service/kml.ashx?token=${tokenMatch[1]}`;
+      const kmlUrl = `${MILAS_PROXY_BASE}/kml?token=${tokenMatch[1]}`;
       const kmzRes = await fetch(kmlUrl, { referrerPolicy: "no-referrer" });
       if (!kmzRes.ok) {
         setMilasError(`KML dosyası alınamadı (HTTP ${kmzRes.status}).`);
