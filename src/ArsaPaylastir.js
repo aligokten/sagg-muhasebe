@@ -1,6 +1,7 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import JSZip from "jszip";
 import ilListe from "./ilListe.json";
+import logoUrl from "./assets/arsapay-logo.png";
 
 const TKGM_API = "https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api/";
 // Milas Belediyesi KEOS e-imar sistemi sadece http destekliyor (https sertifikası yok).
@@ -414,10 +415,46 @@ function buildDXF(originalPoly, pieces, unitM, textH) {
 
 const FONT_DISPLAY = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const FONT_BODY = "'Inter', -apple-system, system-ui, sans-serif";
-const PAPER = "#faf9f6";
-const INK = "#1c1c1a";
-const RULE = "#dcd9d1";
 const ACCENT = "#c1440e";
+
+const THEMES = {
+  light: {
+    paper: "#faf9f6",
+    ink: "#1c1c1a",
+    rule: "#dcd9d1",
+    panel: "#ffffff",
+    muted: "#6b675c",
+    mutedLight: "#9a9686",
+    labelMuted: "#8a8678",
+    gridLine: "#f1efe9",
+    tableHeadBg: "#f5f3ee",
+    tableHeadText: "#55524a",
+    disabledText: "#aba795",
+    errorBg: "#fbeae3",
+    errorBorder: "#f0c9b4",
+    errorText: "#7a2e10",
+    infoBg: "#f3f1ea",
+    infoBorder: "#dcd9d1",
+  },
+  dark: {
+    paper: "#181815",
+    ink: "#f0eee6",
+    rule: "#3a3934",
+    panel: "#222220",
+    muted: "#b8b4a7",
+    mutedLight: "#8c8979",
+    labelMuted: "#9b9788",
+    gridLine: "#28271f",
+    tableHeadBg: "#29281f",
+    tableHeadText: "#d2cfc2",
+    disabledText: "#5d5a4e",
+    errorBg: "#3a2417",
+    errorBorder: "#5b3a22",
+    errorText: "#f0b08c",
+    infoBg: "#242320",
+    infoBorder: "#3a3934",
+  },
+};
 
 function parsePointsInput(text) {
   const lines = text
@@ -459,6 +496,22 @@ const SAMPLE = `0,0
 190,0`;
 
 export default function ArsaPaylastir() {
+  const [theme, setTheme] = useState(() => {
+    try {
+      return window.localStorage.getItem("arsapay-theme") || "light";
+    } catch {
+      return "light";
+    }
+  });
+  const C = THEMES[theme];
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    try {
+      window.localStorage.setItem("arsapay-theme", next);
+    } catch {}
+  }
+
   const [pointsText, setPointsText] = useState(SAMPLE);
   const [polygon, setPolygon] = useState(() => parsePointsInput(SAMPLE));
   const [parseError, setParseError] = useState(null);
@@ -517,6 +570,77 @@ export default function ArsaPaylastir() {
     setRefLine(null);
     setUseRefDirection(false);
   }
+
+  // Sayfa açıldığında varsayılan olarak Anıtkabir parselini (Ankara/Çankaya/Mebusevleri,
+  // ada 4252, parsel 43) TKGM'den çekip yükle.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDefaultParcel() {
+      const ankara = ilListe.find((p) => p.text === "Ankara");
+      if (!ankara) return;
+      setTkgmBusy(true);
+      setTkgmProvinceId(ankara.id);
+      setTkgmDistrictsLoading(true);
+      try {
+        const dRes = await fetch(`${TKGM_API}idariYapi/ilceListe/${ankara.id}`, { referrerPolicy: "no-referrer" });
+        if (!dRes.ok || cancelled) return;
+        const dData = await dRes.json();
+        const districts = (dData.features || [])
+          .map((f) => f.properties)
+          .sort((a, b) => a.text.localeCompare(b.text, "tr"));
+        if (cancelled) return;
+        setTkgmDistricts(districts);
+        setTkgmDistrictsLoading(false);
+        const cankaya = districts.find((d) => d.text === "Çankaya");
+        if (!cankaya) return;
+        setTkgmDistrictId(cankaya.id);
+        setTkgmNeighborhoodsLoading(true);
+        const nRes = await fetch(`${TKGM_API}idariYapi/mahalleListe/${cankaya.id}`, { referrerPolicy: "no-referrer" });
+        if (!nRes.ok || cancelled) return;
+        const nData = await nRes.json();
+        const neighborhoods = (nData.features || [])
+          .map((f) => f.properties)
+          .sort((a, b) => a.text.localeCompare(b.text, "tr"));
+        if (cancelled) return;
+        setTkgmNeighborhoods(neighborhoods);
+        setTkgmNeighborhoodsLoading(false);
+        const mebusevleri = neighborhoods.find((m) => m.text === "Mebusevleri");
+        if (!mebusevleri) return;
+        setTkgmNeighborhoodId(mebusevleri.id);
+        setTkgmAda("4252");
+        setTkgmParsel("43");
+        const pRes = await fetch(`${TKGM_API}parsel/${mebusevleri.id}/4252/43`, { referrerPolicy: "no-referrer" });
+        if (!pRes.ok || cancelled) return;
+        const feature = await pRes.json();
+        if (!feature.geometry || cancelled) return;
+        const ring =
+          feature.geometry.type === "Polygon"
+            ? feature.geometry.coordinates[0]
+            : feature.geometry.type === "MultiPolygon"
+            ? feature.geometry.coordinates[0][0]
+            : null;
+        if (!ring || ring.length < 3) return;
+        const pts = ring.slice();
+        const first = pts[0], lastP = pts[pts.length - 1];
+        if (pts.length > 1 && first[0] === lastP[0] && first[1] === lastP[1]) pts.pop();
+        const text = pts.map(([lon, lat]) => `${lon},${lat}`).join("\n");
+        if (!cancelled) applyPointsText(text);
+      } catch {
+        // Varsayılan parsel yüklenemezse örnek poligon olduğu gibi kalır.
+      } finally {
+        if (!cancelled) {
+          setTkgmBusy(false);
+          setTkgmDistrictsLoading(false);
+          setTkgmNeighborhoodsLoading(false);
+        }
+      }
+    }
+    loadDefaultParcel();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleProvinceChange(id) {
     setTkgmProvinceId(id);
@@ -809,8 +933,12 @@ export default function ArsaPaylastir() {
       .map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(2)},${p[1].toFixed(2)}`)
       .join(" ") + " Z";
 
+  const btnPrimary = { background: C.ink, color: C.paper, border: "none", padding: "11px 16px", fontFamily: FONT_DISPLAY, fontSize: 12.5, letterSpacing: "0.02em", fontWeight: 600 };
+  const btnGhost = { background: "transparent", color: C.ink, border: `1px solid ${C.rule}`, padding: "8px 12px", fontFamily: FONT_DISPLAY, fontSize: 11.5 };
+  const selectStyle = { width: "100%", border: `1px solid ${C.rule}`, padding: "7px 8px", fontSize: 13, background: C.panel, color: C.ink, fontFamily: FONT_BODY };
+
   return (
-    <div style={{ fontFamily: FONT_BODY, background: PAPER, color: INK, minHeight: "100vh", padding: "20px 16px 60px", boxSizing: "border-box" }}>
+    <div style={{ fontFamily: FONT_BODY, background: C.paper, color: C.ink, minHeight: "100vh", padding: "20px 16px 60px", boxSizing: "border-box" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
         * { box-sizing: border-box; }
@@ -820,21 +948,30 @@ export default function ArsaPaylastir() {
       `}</style>
 
       <header style={{ maxWidth: 1040, margin: "0 auto 18px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <h1 style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 22, letterSpacing: "-0.01em", margin: 0 }}>
-            ARSAPAY <span style={{ color: ACCENT }}>/05</span>
-          </h1>
-          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 11, color: "#8a8678", letterSpacing: "0.04em" }}>
-            SAGG+ MİMARLIK — EŞİT ALANLI PARSEL BÖLME
-          </span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ background: "#fff", padding: "5px 10px", borderRadius: 4, display: "flex" }}>
+              <img src={logoUrl} alt="ArsaPay" style={{ height: 32, display: "block" }} />
+            </div>
+            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 11, color: C.labelMuted, letterSpacing: "0.04em" }}>
+              SAGG+ MİMARLIK — EŞİT ALANLI PARSEL BÖLME
+            </span>
+          </div>
+          <button onClick={toggleTheme} style={btnGhost}>
+            {theme === "light" ? "🌙 Koyu Mod" : "☀️ Açık Mod"}
+          </button>
         </div>
-        <div style={{ height: 1, background: RULE, marginTop: 10 }} />
+        <div style={{ height: 1, background: C.rule, marginTop: 10 }} />
       </header>
 
       <div style={{ maxWidth: 1040, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
+        <div style={{ border: `1px solid ${C.infoBorder}`, background: C.infoBg, padding: 12, fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
+          <b style={{ color: C.ink }}>Bilgilendirme:</b> Sitemizde yer alan veriler TKGM Parsel Sorgu sisteminden alınmakta olup, kesin imar bilgisi için işlem yapacağınız belediye ve ilgili birimlere başvurmanız gerekmektedir. Buradan edindiğiniz bilgilerin resmi bir bağlayıcılığı bulunmamaktadır.
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.3fr) minmax(280px,1fr)", gap: 18 }}>
-          <div style={{ border: `1px solid ${RULE}`, background: "#fff" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: `1px solid ${RULE}`, fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: "#6b675c" }}>
+          <div style={{ border: `1px solid ${C.rule}`, background: C.panel }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: `1px solid ${C.rule}`, fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: C.muted }}>
               <span>SINIR GÖRÜNÜMÜ</span>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {!drawMode ? (
@@ -867,16 +1004,16 @@ export default function ArsaPaylastir() {
                 )}
               </div>
             </div>
-            <svg ref={svgRef} viewBox={`0 0 ${VB} ${VB}`} onClick={handleSvgClick} style={{ width: "100%", display: "block", aspectRatio: "1/1", cursor: drawMode ? "crosshair" : "default", background: "#fff" }}>
+            <svg ref={svgRef} viewBox={`0 0 ${VB} ${VB}`} onClick={handleSvgClick} style={{ width: "100%", display: "block", aspectRatio: "1/1", cursor: drawMode ? "crosshair" : "default", background: C.panel }}>
               <defs>
                 <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M20 0 L0 0 0 20" fill="none" stroke="#f1efe9" strokeWidth="1" />
+                  <path d="M20 0 L0 0 0 20" fill="none" stroke={C.gridLine} strokeWidth="1" />
                 </pattern>
               </defs>
               <rect width={VB} height={VB} fill="url(#grid)" />
 
               {!drawMode && polygon.length >= 3 && (
-                <path d={pathOf(polygon)} fill={pieces ? "none" : "rgba(193,68,14,0.06)"} stroke={INK} strokeWidth={pieces ? 1 : 1.6} strokeDasharray={pieces ? "4 3" : "none"} />
+                <path d={pathOf(polygon)} fill={pieces ? "none" : "rgba(193,68,14,0.06)"} stroke={C.ink} strokeWidth={pieces ? 1 : 1.6} strokeDasharray={pieces ? "4 3" : "none"} />
               )}
 
               {pieces &&
@@ -893,7 +1030,7 @@ export default function ArsaPaylastir() {
                       <text x={c[0]} y={c[1] - 4} textAnchor="middle" fontFamily={FONT_DISPLAY} fontSize="11" fontWeight="700" fill={PIECE_COLORS[idx % PIECE_COLORS.length]}>
                         P-{String(idx + 1).padStart(2, "0")}
                       </text>
-                      <text x={c[0]} y={c[1] + 9} textAnchor="middle" fontFamily={FONT_DISPLAY} fontSize="9.5" fill="#55524a">
+                      <text x={c[0]} y={c[1] + 9} textAnchor="middle" fontFamily={FONT_DISPLAY} fontSize="9.5" fill={C.tableHeadText}>
                         {areaM.toFixed(1)} m²
                       </text>
                     </g>
@@ -920,8 +1057,8 @@ export default function ArsaPaylastir() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ border: `1px solid ${RULE}`, background: "#fff", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: "#6b675c" }}>
+            <div style={{ border: `1px solid ${C.rule}`, background: C.panel, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: C.muted }}>
                 TKGM PARSEL SORGU
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -954,11 +1091,11 @@ export default function ArsaPaylastir() {
               {tkgmError && <div style={{ fontSize: 12, color: ACCENT }}>{tkgmError}</div>}
             </div>
 
-            <div style={{ border: `1px solid ${RULE}`, background: "#fff", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: "#6b675c" }}>
+            <div style={{ border: `1px solid ${C.rule}`, background: C.panel, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: C.muted }}>
                 MİLAS BELEDİYESİ E-İMAR (KEOS)
               </div>
-              <div style={{ fontSize: 11.5, color: "#9a9686" }}>
+              <div style={{ fontSize: 11.5, color: C.mutedLight }}>
                 Parsel ID'yi Milas e-imar sorgu sayfasından (keos.milas.bel.tr/imardurumu) alıp girin.
               </div>
               <input placeholder="Parsel ID (örn. 173293)" value={milasParselId} onChange={(e) => setMilasParselId(e.target.value)} style={selectStyle} />
@@ -968,24 +1105,24 @@ export default function ArsaPaylastir() {
               {milasError && <div style={{ fontSize: 12, color: ACCENT }}>{milasError}</div>}
             </div>
 
-            <Field label="Koordinatlar (x,y — her satır bir köşe)">
-              <textarea value={pointsText} onChange={(e) => applyPointsText(e.target.value)} rows={6} style={{ width: "100%", fontFamily: FONT_DISPLAY, fontSize: 12, border: `1px solid ${RULE}`, padding: 8, resize: "vertical", background: "#fff" }} />
+            <Field label="Koordinatlar (x,y — her satır bir köşe)" C={C}>
+              <textarea value={pointsText} onChange={(e) => applyPointsText(e.target.value)} rows={6} style={{ width: "100%", fontFamily: FONT_DISPLAY, fontSize: 12, border: `1px solid ${C.rule}`, padding: 8, resize: "vertical", background: C.panel, color: C.ink }} />
             </Field>
             {parseError && <div style={{ fontSize: 12, color: ACCENT }}>{parseError}</div>}
             {!parseError && isGeoInput && (
-              <div style={{ fontSize: 12, color: "#6b675c" }}>
+              <div style={{ fontSize: 12, color: C.muted }}>
                 GPS koordinatı (enlem/boylam) algılandı — parselin merkezine göre yerel metre düzlemine otomatik dönüştürüldü.
               </div>
             )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Field label="Parça sayısı (n)"><NumberInput value={n} onChange={setN} min={2} step={1} /></Field>
-              <Field label="1 birim = ? metre"><NumberInput value={unitM} onChange={setUnitM} min={0.001} step={0.1} /></Field>
-              <Field label="Min. kenar (m, 0=yok)"><NumberInput value={minM} onChange={setMinM} min={0} step={1} /></Field>
-              <Field label="Arama hassasiyeti (°)"><NumberInput value={stepDeg} onChange={setStepDeg} min={1} max={45} step={1} /></Field>
+              <Field label="Parça sayısı (n)" C={C}><NumberInput value={n} onChange={setN} min={2} step={1} C={C} /></Field>
+              <Field label="1 birim = ? metre" C={C}><NumberInput value={unitM} onChange={setUnitM} min={0.001} step={0.1} C={C} /></Field>
+              <Field label="Min. kenar (m, 0=yok)" C={C}><NumberInput value={minM} onChange={setMinM} min={0} step={1} C={C} /></Field>
+              <Field label="Arama hassasiyeti (°)" C={C}><NumberInput value={stepDeg} onChange={setStepDeg} min={1} max={45} step={1} C={C} /></Field>
             </div>
 
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: refLine ? INK : "#aba795", cursor: refLine ? "pointer" : "not-allowed" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: refLine ? C.ink : C.disabledText, cursor: refLine ? "pointer" : "not-allowed" }}>
               <input
                 type="checkbox"
                 checked={useRefDirection}
@@ -995,9 +1132,9 @@ export default function ArsaPaylastir() {
               Referans çizgisine dik kesimler kullan (şeritler çizgiye paralel)
             </label>
 
-            <div style={{ fontSize: 12, color: "#6b675c", fontFamily: FONT_DISPLAY }}>
-              Toplam alan: <b style={{ color: INK }}>{(totalArea * unitM * unitM).toFixed(2)} m²</b>
-              {" · "}Hedef parça: <b style={{ color: INK }}>{((totalArea * unitM * unitM) / n).toFixed(2)} m²</b>
+            <div style={{ fontSize: 12, color: C.muted, fontFamily: FONT_DISPLAY }}>
+              Toplam alan: <b style={{ color: C.ink }}>{(totalArea * unitM * unitM).toFixed(2)} m²</b>
+              {" · "}Hedef parça: <b style={{ color: C.ink }}>{((totalArea * unitM * unitM) / n).toFixed(2)} m²</b>
             </div>
 
             <button onClick={runSplit} disabled={status === "running" || polygon.length < 3} style={btnPrimary}>
@@ -1005,7 +1142,7 @@ export default function ArsaPaylastir() {
             </button>
 
             {status === "error" && (
-              <div style={{ fontSize: 12.5, color: "#7a2e10", background: "#fbeae3", border: "1px solid #f0c9b4", padding: 10, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12.5, color: C.errorText, background: C.errorBg, border: `1px solid ${C.errorBorder}`, padding: 10, lineHeight: 1.5 }}>
                 {errorMsg}
               </div>
             )}
@@ -1015,15 +1152,15 @@ export default function ArsaPaylastir() {
         </div>
 
         {pieces && (
-          <div style={{ border: `1px solid ${RULE}`, background: "#fff" }}>
-            <div style={{ padding: "8px 12px", borderBottom: `1px solid ${RULE}`, fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: "#6b675c" }}>
+          <div style={{ border: `1px solid ${C.rule}`, background: C.panel }}>
+            <div style={{ padding: "8px 12px", borderBottom: `1px solid ${C.rule}`, fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: C.muted }}>
               PARSEL PAYLAŞIM LEJANTI
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT_DISPLAY, fontSize: 12.5 }}>
               <thead>
-                <tr style={{ background: "#f5f3ee" }}>
+                <tr style={{ background: C.tableHeadBg }}>
                   {["Parça", "Alan (m²)", "Min kenar (m)", "Renk", "Kenarlar (m)"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "7px 10px", borderBottom: `1px solid ${RULE}`, fontWeight: 600, color: "#55524a" }}>{h}</th>
+                    <th key={h} style={{ textAlign: "left", padding: "7px 10px", borderBottom: `1px solid ${C.rule}`, fontWeight: 600, color: C.tableHeadText }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1037,18 +1174,18 @@ export default function ArsaPaylastir() {
                   for (let i = 0; i < m; i++) edges.push(dist(simp[i], simp[(i + 1) % m]) * unitM);
                   const color = PIECE_COLORS[idx % PIECE_COLORS.length];
                   return (
-                    <tr key={idx} style={{ borderBottom: `1px solid ${RULE}` }}>
+                    <tr key={idx} style={{ borderBottom: `1px solid ${C.rule}` }}>
                       <td style={{ padding: "7px 10px", fontWeight: 700 }}>P-{String(idx + 1).padStart(2, "0")}</td>
                       <td style={{ padding: "7px 10px" }}>{areaM.toFixed(2)}</td>
                       <td style={{ padding: "7px 10px" }}>{mn.toFixed(2)}</td>
                       <td style={{ padding: "7px 10px" }}>
                         <span style={{ display: "inline-block", width: 11, height: 11, background: color, borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />
                       </td>
-                      <td style={{ padding: "7px 10px", color: "#6b675c" }}>{edges.map((d, i) => `K${i + 1}=${d.toFixed(2)}`).join(", ")}</td>
+                      <td style={{ padding: "7px 10px", color: C.muted }}>{edges.map((d, i) => `K${i + 1}=${d.toFixed(2)}`).join(", ")}</td>
                     </tr>
                   );
                 })}
-                <tr style={{ background: "#f5f3ee" }}>
+                <tr style={{ background: C.tableHeadBg }}>
                   <td style={{ padding: "7px 10px", fontWeight: 600 }}>Toplam (parçalar)</td>
                   <td style={{ padding: "7px 10px", fontWeight: 600 }} colSpan={4}>
                     {pieces.reduce((s, sp) => s + areaOf(sp) * unitM * unitM, 0).toFixed(2)} m²
@@ -1065,18 +1202,18 @@ export default function ArsaPaylastir() {
           </div>
         )}
 
-        <footer style={{ fontSize: 11, color: "#9a9686", fontFamily: FONT_DISPLAY, textAlign: "center", paddingTop: 4 }}>
-          Algoritma: SAGG_ARSA_PAYLASTIR_V5.lsp ile aynı mantık — tarayıcıda çalışır, AutoCAD gerekmez.
+        <footer style={{ fontSize: 11, color: C.mutedLight, fontFamily: FONT_DISPLAY, textAlign: "center", paddingTop: 4 }}>
+          ArsaPay v1.0 uygulaması SAGG markasına ait olup, tüm hakları saklıdır. 2026.
         </footer>
       </div>
     </div>
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, children, C }) {
   return (
     <label style={{ display: "block" }}>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 10.5, color: "#8a8678", letterSpacing: "0.03em", marginBottom: 5 }}>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 10.5, color: C.labelMuted, letterSpacing: "0.03em", marginBottom: 5 }}>
         {label.toUpperCase()}
       </div>
       {children}
@@ -1084,13 +1221,9 @@ function Field({ label, children }) {
   );
 }
 
-function NumberInput({ value, onChange, min, max, step }) {
+function NumberInput({ value, onChange, min, max, step, C }) {
   return (
     <input type="number" value={value} min={min} max={max} step={step} onChange={(e) => onChange(Number(e.target.value))}
-      style={{ width: "100%", border: `1px solid ${RULE}`, padding: "7px 8px", fontSize: 13, background: "#fff" }} />
+      style={{ width: "100%", border: `1px solid ${C.rule}`, padding: "7px 8px", fontSize: 13, background: C.panel, color: C.ink }} />
   );
 }
-
-const btnPrimary = { background: INK, color: "#fff", border: "none", padding: "11px 16px", fontFamily: FONT_DISPLAY, fontSize: 12.5, letterSpacing: "0.02em", fontWeight: 600 };
-const btnGhost = { background: "transparent", color: INK, border: `1px solid ${RULE}`, padding: "8px 12px", fontFamily: FONT_DISPLAY, fontSize: 11.5 };
-const selectStyle = { width: "100%", border: `1px solid ${RULE}`, padding: "7px 8px", fontSize: 13, background: "#fff", fontFamily: FONT_BODY };
