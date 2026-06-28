@@ -400,6 +400,24 @@ function parsePointsInput(text) {
   return pts;
 }
 
+// X=boylam (-180..180), Y=enlem (-90..90) aralığındaysa GPS (WGS84) koordinatı sayılır.
+function looksLikeLatLon(pts) {
+  return pts.every(([x, y]) => Math.abs(x) <= 180 && Math.abs(y) <= 90);
+}
+
+// Parselin ağırlık merkezine göre düzlemsel (equirectangular) projeksiyon ile yerel metreye çevirir.
+// Küçük parsel ölçeğinde (birkaç km'ye kadar) yeterli doğruluktadır.
+const EARTH_R_M = 111320;
+function projectLatLonToMeters(pts) {
+  const lon0 = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const lat0 = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  const cosLat0 = Math.cos((lat0 * Math.PI) / 180);
+  return pts.map(([lon, lat]) => [
+    (lon - lon0) * EARTH_R_M * cosLat0,
+    (lat - lat0) * EARTH_R_M,
+  ]);
+}
+
 const SAMPLE = `0,0
 0,180
 60,210
@@ -410,6 +428,7 @@ export default function ArsaPaylastir() {
   const [pointsText, setPointsText] = useState(SAMPLE);
   const [polygon, setPolygon] = useState(() => parsePointsInput(SAMPLE));
   const [parseError, setParseError] = useState(null);
+  const [isGeoInput, setIsGeoInput] = useState(false);
 
   const [n, setN] = useState(4);
   const [unitM, setUnitM] = useState(1);
@@ -434,7 +453,10 @@ export default function ArsaPaylastir() {
       return;
     }
     setParseError(null);
-    setPolygon(pts);
+    const geo = looksLikeLatLon(pts);
+    setIsGeoInput(geo);
+    setPolygon(geo ? projectLatLonToMeters(pts) : pts);
+    if (geo) setUnitM(1);
     setPieces(null);
     setStatus("idle");
   }
@@ -616,6 +638,11 @@ export default function ArsaPaylastir() {
               <textarea value={pointsText} onChange={(e) => applyPointsText(e.target.value)} rows={6} style={{ width: "100%", fontFamily: FONT_DISPLAY, fontSize: 12, border: `1px solid ${RULE}`, padding: 8, resize: "vertical", background: "#fff" }} />
             </Field>
             {parseError && <div style={{ fontSize: 12, color: ACCENT }}>{parseError}</div>}
+            {!parseError && isGeoInput && (
+              <div style={{ fontSize: 12, color: "#6b675c" }}>
+                GPS koordinatı (enlem/boylam) algılandı — parselin merkezine göre yerel metre düzlemine otomatik dönüştürüldü.
+              </div>
+            )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Field label="Parça sayısı (n)"><NumberInput value={n} onChange={setN} min={2} step={1} /></Field>
