@@ -7,7 +7,7 @@ const TKGM_API = "https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api/";
 // https sayfalardan mixed-content engelini aşmak için bir Cloudflare Worker proxy
 // kullanılıyor (bkz. docs/milas-proxy-worker.js). Kendi worker adresinizi deploy
 // ettikten sonra buraya yazın.
-const MILAS_PROXY_BASE = "https://REPLACE-WITH-YOUR-WORKER.workers.dev";
+const MILAS_PROXY_BASE = "https://milas-eimar-proxy.aligokten99.workers.dev";
 
 /* =========================================================
    GEOMETRİ ÇEKİRDEĞİ
