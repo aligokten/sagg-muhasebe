@@ -1,4 +1,7 @@
 import React, { useState, useRef, useMemo } from "react";
+import ilListe from "./ilListe.json";
+
+const TKGM_API = "https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api/";
 
 /* =========================================================
    GEOMETRİ ÇEKİRDEĞİ
@@ -471,6 +474,16 @@ export default function ArsaPaylastir() {
   const [refLine, setRefLine] = useState(null);
   const [useRefDirection, setUseRefDirection] = useState(false);
 
+  const [tkgmProvinceId, setTkgmProvinceId] = useState("");
+  const [tkgmDistrictId, setTkgmDistrictId] = useState("");
+  const [tkgmNeighborhoodId, setTkgmNeighborhoodId] = useState("");
+  const [tkgmDistricts, setTkgmDistricts] = useState([]);
+  const [tkgmNeighborhoods, setTkgmNeighborhoods] = useState([]);
+  const [tkgmAda, setTkgmAda] = useState("");
+  const [tkgmParsel, setTkgmParsel] = useState("");
+  const [tkgmBusy, setTkgmBusy] = useState(false);
+  const [tkgmError, setTkgmError] = useState("");
+
   const svgRef = useRef(null);
 
   const totalArea = useMemo(() => (polygon.length >= 3 ? areaOf(polygon) : 0), [polygon]);
@@ -491,6 +504,98 @@ export default function ArsaPaylastir() {
     setStatus("idle");
     setRefLine(null);
     setUseRefDirection(false);
+  }
+
+  async function handleProvinceChange(id) {
+    setTkgmProvinceId(id);
+    setTkgmDistrictId("");
+    setTkgmNeighborhoodId("");
+    setTkgmDistricts([]);
+    setTkgmNeighborhoods([]);
+    setTkgmError("");
+    if (!id) return;
+    try {
+      const res = await fetch(`${TKGM_API}idariYapi/ilceListe/${id}`);
+      const data = await res.json();
+      const list = (data.features || [])
+        .map((f) => f.properties)
+        .sort((a, b) => a.text.localeCompare(b.text, "tr"));
+      setTkgmDistricts(list);
+    } catch {
+      setTkgmError("İlçe listesi alınamadı. İnternet bağlantınızı kontrol edin.");
+    }
+  }
+
+  async function handleDistrictChange(id) {
+    setTkgmDistrictId(id);
+    setTkgmNeighborhoodId("");
+    setTkgmNeighborhoods([]);
+    setTkgmError("");
+    if (!id) return;
+    try {
+      const res = await fetch(`${TKGM_API}idariYapi/mahalleListe/${id}`);
+      const data = await res.json();
+      const list = (data.features || [])
+        .map((f) => f.properties)
+        .sort((a, b) => a.text.localeCompare(b.text, "tr"));
+      setTkgmNeighborhoods(list);
+    } catch {
+      setTkgmError("Mahalle listesi alınamadı. İnternet bağlantınızı kontrol edin.");
+    }
+  }
+
+  async function fetchParcel() {
+    const ada = tkgmAda.trim();
+    const parsel = tkgmParsel.trim();
+    if (!tkgmNeighborhoodId || !ada || !parsel) {
+      setTkgmError("İl, ilçe, mahalle seçip ada ve parsel numarasını girin.");
+      return;
+    }
+    setTkgmBusy(true);
+    setTkgmError("");
+    try {
+      const res = await fetch(`${TKGM_API}parsel/${tkgmNeighborhoodId}/${ada}/${parsel}`);
+      if (res.status === 404) {
+        setTkgmError("Parsel bulunamadı. Ada/parsel numaralarını kontrol edin.");
+        return;
+      }
+      if (res.status === 403) {
+        setTkgmError("TKGM sorgu limiti aşıldı. Daha sonra tekrar deneyin.");
+        return;
+      }
+      if (res.status === 401 || res.status === 412) {
+        setTkgmError("Bu parsel kadastro kısıtlaması nedeniyle sorgulanamıyor.");
+        return;
+      }
+      if (!res.ok) {
+        setTkgmError("TKGM sorgusunda bir hata oluştu.");
+        return;
+      }
+      const feature = await res.json();
+      if (!feature.geometry) {
+        setTkgmError("Bu parsel için sınır (geometri) bilgisi bulunamadı (ana taşınmaz olabilir).");
+        return;
+      }
+      const ring =
+        feature.geometry.type === "Polygon"
+          ? feature.geometry.coordinates[0]
+          : feature.geometry.type === "MultiPolygon"
+          ? feature.geometry.coordinates[0][0]
+          : null;
+      if (!ring || ring.length < 3) {
+        setTkgmError("Parsel geometrisi okunamadı.");
+        return;
+      }
+      const pts = ring.slice();
+      const first = pts[0], lastP = pts[pts.length - 1];
+      if (pts.length > 1 && first[0] === lastP[0] && first[1] === lastP[1]) pts.pop();
+      const text = pts.map(([lon, lat]) => `${lon},${lat}`).join("\n");
+      applyPointsText(text);
+    } catch {
+      setTkgmError("TKGM sunucusuna bağlanılamadı. İnternet bağlantınızı kontrol edin.");
+    } finally {
+      setTkgmBusy(false);
+    }
   }
 
   function runSplit() {
@@ -719,6 +824,40 @@ export default function ArsaPaylastir() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ border: `1px solid ${RULE}`, background: "#fff", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 11, letterSpacing: "0.03em", color: "#6b675c" }}>
+                TKGM PARSEL SORGU
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <select value={tkgmProvinceId} onChange={(e) => handleProvinceChange(e.target.value)} style={selectStyle}>
+                  <option value="">İl seçin</option>
+                  {ilListe.map((p) => (
+                    <option key={p.id} value={p.id}>{p.text}</option>
+                  ))}
+                </select>
+                <select value={tkgmDistrictId} onChange={(e) => handleDistrictChange(e.target.value)} disabled={!tkgmProvinceId} style={selectStyle}>
+                  <option value="">İlçe seçin</option>
+                  {tkgmDistricts.map((d) => (
+                    <option key={d.id} value={d.id}>{d.text}</option>
+                  ))}
+                </select>
+                <select value={tkgmNeighborhoodId} onChange={(e) => setTkgmNeighborhoodId(e.target.value)} disabled={!tkgmDistrictId} style={selectStyle}>
+                  <option value="">Mahalle seçin</option>
+                  {tkgmNeighborhoods.map((m) => (
+                    <option key={m.id} value={m.id}>{m.text}</option>
+                  ))}
+                </select>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input placeholder="Ada" value={tkgmAda} onChange={(e) => setTkgmAda(e.target.value)} style={selectStyle} />
+                  <input placeholder="Parsel" value={tkgmParsel} onChange={(e) => setTkgmParsel(e.target.value)} style={selectStyle} />
+                </div>
+              </div>
+              <button onClick={fetchParcel} disabled={tkgmBusy || !tkgmNeighborhoodId} style={btnGhost}>
+                {tkgmBusy ? "Sorgulanıyor…" : "Parsel Bul"}
+              </button>
+              {tkgmError && <div style={{ fontSize: 12, color: ACCENT }}>{tkgmError}</div>}
+            </div>
+
             <Field label="Koordinatlar (x,y — her satır bir köşe)">
               <textarea value={pointsText} onChange={(e) => applyPointsText(e.target.value)} rows={6} style={{ width: "100%", fontFamily: FONT_DISPLAY, fontSize: 12, border: `1px solid ${RULE}`, padding: 8, resize: "vertical", background: "#fff" }} />
             </Field>
@@ -844,3 +983,4 @@ function NumberInput({ value, onChange, min, max, step }) {
 
 const btnPrimary = { background: INK, color: "#fff", border: "none", padding: "11px 16px", fontFamily: FONT_DISPLAY, fontSize: 12.5, letterSpacing: "0.02em", fontWeight: 600 };
 const btnGhost = { background: "transparent", color: INK, border: `1px solid ${RULE}`, padding: "8px 12px", fontFamily: FONT_DISPLAY, fontSize: 11.5 };
+const selectStyle = { width: "100%", border: `1px solid ${RULE}`, padding: "7px 8px", fontSize: 13, background: "#fff", fontFamily: FONT_BODY };
