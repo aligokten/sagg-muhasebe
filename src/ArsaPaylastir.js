@@ -518,7 +518,7 @@ export default function ArsaPaylastir() {
     if (!id) return;
     setTkgmDistrictsLoading(true);
     try {
-      const res = await fetch(`${TKGM_API}idariYapi/ilceListe/${id}`);
+      const res = await fetch(`${TKGM_API}idariYapi/ilceListe/${id}`, { referrerPolicy: "no-referrer" });
       if (!res.ok) {
         setTkgmError(`İlçe listesi alınamadı (HTTP ${res.status}).`);
         return;
@@ -546,7 +546,7 @@ export default function ArsaPaylastir() {
     if (!id) return;
     setTkgmNeighborhoodsLoading(true);
     try {
-      const res = await fetch(`${TKGM_API}idariYapi/mahalleListe/${id}`);
+      const res = await fetch(`${TKGM_API}idariYapi/mahalleListe/${id}`, { referrerPolicy: "no-referrer" });
       if (!res.ok) {
         setTkgmError(`Mahalle listesi alınamadı (HTTP ${res.status}).`);
         return;
@@ -576,7 +576,7 @@ export default function ArsaPaylastir() {
     setTkgmBusy(true);
     setTkgmError("");
     try {
-      const res = await fetch(`${TKGM_API}parsel/${tkgmNeighborhoodId}/${ada}/${parsel}`);
+      const res = await fetch(`${TKGM_API}parsel/${tkgmNeighborhoodId}/${ada}/${parsel}`, { referrerPolicy: "no-referrer" });
       if (res.status === 404) {
         setTkgmError("Parsel bulunamadı. Ada/parsel numaralarını kontrol edin.");
         return;

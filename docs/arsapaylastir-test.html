@@ -24082,7 +24082,7 @@
       if (!id) return;
       setTkgmDistrictsLoading(true);
       try {
-        const res = await fetch(`${TKGM_API}idariYapi/ilceListe/${id}`);
+        const res = await fetch(`${TKGM_API}idariYapi/ilceListe/${id}`, { referrerPolicy: "no-referrer" });
         if (!res.ok) {
           setTkgmError(`\u0130l\xE7e listesi al\u0131namad\u0131 (HTTP ${res.status}).`);
           return;
@@ -24107,7 +24107,7 @@
       if (!id) return;
       setTkgmNeighborhoodsLoading(true);
       try {
-        const res = await fetch(`${TKGM_API}idariYapi/mahalleListe/${id}`);
+        const res = await fetch(`${TKGM_API}idariYapi/mahalleListe/${id}`, { referrerPolicy: "no-referrer" });
         if (!res.ok) {
           setTkgmError(`Mahalle listesi al\u0131namad\u0131 (HTTP ${res.status}).`);
           return;
@@ -24134,7 +24134,7 @@
       setTkgmBusy(true);
       setTkgmError("");
       try {
-        const res = await fetch(`${TKGM_API}parsel/${tkgmNeighborhoodId}/${ada}/${parsel}`);
+        const res = await fetch(`${TKGM_API}parsel/${tkgmNeighborhoodId}/${ada}/${parsel}`, { referrerPolicy: "no-referrer" });
         if (res.status === 404) {
           setTkgmError("Parsel bulunamad\u0131. Ada/parsel numaralar\u0131n\u0131 kontrol edin.");
           return;
