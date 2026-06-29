@@ -14,7 +14,7 @@ const ts = (d) => {
 // (açılış bakiyesi de o projenin açılışı olur). projectId null ise
 // carinin tüm hareketleri (tüm işler + işsiz kayıtlar) döner.
 export const cariMovements = (customerId, data, projectId = null) => {
-  const { invoices = [], transactions = [], customers = [], checks = [], projects = [] } = data;
+  const { invoices = [], transactions = [], customers = [], checks = [], projects = [], expenses = [], incomes = [] } = data;
   const customer = customers.find((c) => c.id === customerId);
   const projName = (id) => projects.find((p) => p.id === id)?.name || '';
   const matchProj = (rec) => (projectId == null ? true : (rec.projectId || null) === projectId);
@@ -37,7 +37,7 @@ export const cariMovements = (customerId, data, projectId = null) => {
   }
 
   invoices
-    .filter((i) => i.customerId === customerId && matchProj(i))
+    .filter((i) => i.customerId === customerId && i.status !== 'cancelled' && matchProj(i))
     .forEach((i) => {
       const isSales = i.type !== 'purchase';
       rows.push({
@@ -87,6 +87,20 @@ export const cariMovements = (customerId, data, projectId = null) => {
         projectName: projName(c.projectId),
         ref: { kind: 'check', id: c.id },
       });
+    });
+
+  // Cari ile ilişkilendirilmiş gelir/giderler
+  incomes
+    .filter((i) => i.customerId === customerId && matchProj(i))
+    .forEach((i) => {
+      const amt = Number(i.amount) || 0;
+      rows.push({ date: i.date, type: 'Gelir', description: i.description || i.category || 'Gelir', category: i.category || '', borc: 0, alacak: amt, projectId: i.projectId || null, projectName: projName(i.projectId), ref: { kind: 'income', id: i.id } });
+    });
+  expenses
+    .filter((e) => e.customerId === customerId && matchProj(e))
+    .forEach((e) => {
+      const amt = Number(e.amount) || 0;
+      rows.push({ date: e.date, type: 'Gider', description: e.description || e.category || 'Gider', category: e.category || '', borc: amt, alacak: 0, projectId: e.projectId || null, projectName: projName(e.projectId), ref: { kind: 'expense', id: e.id } });
     });
 
   rows.sort((a, b) => ts(a.date) - ts(b.date));
@@ -220,6 +234,7 @@ export const productStock = (productId, data) => {
   const product = products.find((p) => p.id === productId);
   let stock = Number(product?.openingStock) || 0;
   invoices.forEach((inv) => {
+    if (inv.status === 'cancelled') return;
     (inv.items || []).forEach((it) => {
       if (it.productId !== productId) return;
       const qty = Number(it.quantity) || 0;
