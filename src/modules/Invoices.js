@@ -1,10 +1,10 @@
 // --- Faturalar (Satış + Alış) ---
 import React, { useState, useMemo } from 'react';
-import { Eye, Edit, Trash2, Send, MoreVertical, FileText, Ban } from 'lucide-react';
+import { Eye, Edit, Trash2, Send, FileText, Ban } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord } from '../firebase';
 import { Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, sum } from '../utils';
-import { PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard, ConfirmDialog } from '../components/ui';
+import { PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard, ConfirmDialog, ActionMenu } from '../components/ui';
 import DocumentForm from '../components/DocumentForm';
 import PrintView from '../components/PrintView';
 
@@ -21,7 +21,6 @@ export default function Invoices({ data, userId }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
-  const [menuId, setMenuId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
 
   const list = useMemo(
@@ -118,26 +117,18 @@ export default function Invoices({ data, userId }) {
                     </button>
                   </Td>
                   <Td align="right" className="font-semibold text-gray-800">{formatCurrency(inv.grandTotal)}</Td>
-                  <Td align="right" className="relative">
-                    <button onClick={() => setMenuId(menuId === inv.id ? null : inv.id)} className="p-2 rounded-full hover:bg-gray-200 text-gray-500">
-                      <MoreVertical size={18} />
-                    </button>
-                    {menuId === inv.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
-                        <div className="origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 text-left py-1">
-                          <button onClick={() => { setViewing(inv); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Eye size={15} className="mr-3" />Görüntüle</button>
-                          <button onClick={() => { setEditing(inv); setFormOpen(true); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Edit size={15} className="mr-3" />Düzenle</button>
-                          <button onClick={() => { setViewing(inv); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Send size={15} className="mr-3" />Yazdır / PDF</button>
-                          {inv.status === 'cancelled' ? (
-                            <button onClick={() => { updateRecord(userId, 'invoices', inv.id, { status: 'unpaid' }); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Ban size={15} className="mr-3" />İptali Geri Al</button>
-                          ) : (
-                            <button onClick={() => { cancelInvoice(inv); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-amber-600 hover:bg-gray-100"><Ban size={15} className="mr-3" />İptal Et</button>
-                          )}
-                          <button onClick={() => { setConfirmId(inv.id); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"><Trash2 size={15} className="mr-3" />Sil</button>
-                        </div>
-                      </>
-                    )}
+                  <Td align="right" onClick={(e) => e.stopPropagation()}>
+                    <ActionMenu
+                      items={[
+                        { label: 'Görüntüle', icon: Eye, onClick: () => setViewing(inv) },
+                        { label: 'Düzenle', icon: Edit, onClick: () => { setEditing(inv); setFormOpen(true); } },
+                        { label: 'Yazdır / PDF', icon: Send, onClick: () => setViewing(inv) },
+                        inv.status === 'cancelled'
+                          ? { label: 'İptali Geri Al', icon: Ban, onClick: () => updateRecord(userId, 'invoices', inv.id, { status: 'unpaid' }) }
+                          : { label: 'İptal Et', icon: Ban, onClick: () => cancelInvoice(inv) },
+                        { label: 'Sil', icon: Trash2, danger: true, onClick: () => setConfirmId(inv.id) },
+                      ]}
+                    />
                   </Td>
                 </tr>
               );

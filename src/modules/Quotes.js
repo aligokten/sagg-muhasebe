@@ -1,9 +1,9 @@
 // --- Teklifler ---
 import React, { useState, useMemo } from 'react';
-import { Edit, Trash2, MoreVertical, FileCheck2, FileText } from 'lucide-react';
+import { Edit, Trash2, FileCheck2, FileText, Eye, CheckCircle2, XCircle } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, sum, nextDocNumber } from '../utils';
-import { PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard, ConfirmDialog } from '../components/ui';
+import { PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard, ConfirmDialog, ActionMenu } from '../components/ui';
 import DocumentForm from '../components/DocumentForm';
 import PrintView from '../components/PrintView';
 
@@ -19,7 +19,6 @@ export default function Quotes({ data, userId }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
-  const [menuId, setMenuId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
 
   const list = useMemo(() => [...quotes].sort((a, b) => (b.docNumber || '').localeCompare(a.docNumber || '')), [quotes]);
@@ -54,13 +53,11 @@ export default function Quotes({ data, userId }) {
       status: 'unpaid',
     });
     await updateRecord(userId, 'quotes', id, { status: 'invoiced' });
-    setMenuId(null);
     alert('Teklif faturaya dönüştürüldü.');
   };
 
   const setStatus = async (q, status) => {
     await updateRecord(userId, 'quotes', q.id, { status });
-    setMenuId(null);
   };
 
   return (
@@ -89,20 +86,17 @@ export default function Quotes({ data, userId }) {
                   <Td className="text-gray-500">{formatDateShort(q.date)}</Td>
                   <Td><Badge color={st.color}>{st.label}</Badge></Td>
                   <Td align="right" className="font-semibold text-gray-800">{formatCurrency(q.grandTotal)}</Td>
-                  <Td align="right" className="relative">
-                    <button onClick={() => setMenuId(menuId === q.id ? null : q.id)} className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><MoreVertical size={18} /></button>
-                    {menuId === q.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
-                        <div className="origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 text-left py-1">
-                          <button onClick={() => { setEditing(q); setFormOpen(true); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Edit size={15} className="mr-3" />Düzenle</button>
-                          <button onClick={() => setStatus(q, 'accepted')} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Kabul Edildi</button>
-                          <button onClick={() => setStatus(q, 'rejected')} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Reddedildi</button>
-                          <button onClick={() => convertToInvoice(q)} className="flex items-center w-full px-4 py-2 text-sm text-sky-700 hover:bg-gray-100"><FileCheck2 size={15} className="mr-3" />Faturaya Dönüştür</button>
-                          <button onClick={() => { setConfirmId(q.id); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"><Trash2 size={15} className="mr-3" />Sil</button>
-                        </div>
-                      </>
-                    )}
+                  <Td align="right" onClick={(e) => e.stopPropagation()}>
+                    <ActionMenu
+                      items={[
+                        { label: 'Görüntüle', icon: Eye, onClick: () => setViewing(q) },
+                        { label: 'Düzenle', icon: Edit, onClick: () => { setEditing(q); setFormOpen(true); } },
+                        { label: 'Kabul Edildi', icon: CheckCircle2, onClick: () => setStatus(q, 'accepted') },
+                        { label: 'Reddedildi', icon: XCircle, onClick: () => setStatus(q, 'rejected') },
+                        { label: 'Faturaya Dönüştür', icon: FileCheck2, onClick: () => convertToInvoice(q) },
+                        { label: 'Sil', icon: Trash2, danger: true, onClick: () => setConfirmId(q.id) },
+                      ]}
+                    />
                   </Td>
                 </tr>
               );
