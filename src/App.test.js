@@ -43,6 +43,20 @@ test('accountMovements giriş ve çıkışları toplar', () => {
   expect(accountMovements('a1', data).balance).toBe(400);
 });
 
+test('cariMovements iptal faturayı saymaz, cari-bağlı gelir/gideri sayar', () => {
+  const data = {
+    customers: [{ id: 'c1', openingBalance: 0 }],
+    invoices: [
+      { id: 'i1', customerId: 'c1', type: 'sales', grandTotal: 1000, date: new Date() },
+      { id: 'i2', customerId: 'c1', type: 'sales', grandTotal: 999, status: 'cancelled', date: new Date() },
+    ],
+    incomes: [{ id: 'g1', customerId: 'c1', amount: 300, date: new Date() }],   // alacak
+    expenses: [{ id: 'e1', customerId: 'c1', amount: 200, date: new Date() }],  // borç
+  };
+  // 1000 (borç) - 300 (gelir/alacak) + 200 (gider/borç) = 900 ; iptal fatura sayılmaz
+  expect(cariMovements('c1', data).balance).toBe(900);
+});
+
 test('cariMovements proje filtresi yalnızca o işe ait hareketleri sayar', () => {
   const data = {
     customers: [{ id: 'c1', openingBalance: 0 }],

@@ -8,7 +8,8 @@ import { PageHeader, Card } from '../components/ui';
 const PIE_COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899', '#84cc16'];
 
 export default function Reports({ data }) {
-  const { invoices = [], expenses = [], incomes = [], customers = [] } = data;
+  const { expenses = [], incomes = [], customers = [] } = data;
+  const invoices = useMemo(() => (data.invoices || []).filter((i) => i.status !== 'cancelled'), [data.invoices]);
 
   // KDV raporu
   const vat = useMemo(() => {

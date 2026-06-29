@@ -1,6 +1,6 @@
 // --- Faturalar (Satış + Alış) ---
 import React, { useState, useMemo } from 'react';
-import { Eye, Edit, Trash2, Send, MoreVertical, FileText } from 'lucide-react';
+import { Eye, Edit, Trash2, Send, MoreVertical, FileText, Ban } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord } from '../firebase';
 import { Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, sum } from '../utils';
@@ -12,6 +12,7 @@ const statusMeta = {
   unpaid: { label: 'Ödenmedi', color: 'red' },
   partial: { label: 'Kısmi', color: 'yellow' },
   paid: { label: 'Ödendi', color: 'green' },
+  cancelled: { label: 'İptal', color: 'gray' },
 };
 
 export default function Invoices({ data, userId }) {
@@ -29,10 +30,16 @@ export default function Invoices({ data, userId }) {
   );
 
   const stats = useMemo(() => {
-    const total = sum(list, (i) => i.grandTotal);
-    const unpaid = sum(list.filter((i) => i.status !== 'paid'), (i) => i.grandTotal);
-    return { total, unpaid, count: list.length };
+    const active = list.filter((i) => i.status !== 'cancelled');
+    const total = sum(active, (i) => i.grandTotal);
+    const unpaid = sum(active.filter((i) => i.status !== 'paid'), (i) => i.grandTotal);
+    return { total, unpaid, count: active.length };
   }, [list]);
+
+  const cancelInvoice = async (inv) => {
+    if (!window.confirm(`${inv.docNumber} numaralı fatura iptal edilsin mi? (Kayıt durur, bakiyelere/stoğa yansımaz; istediğinizde geri alabilirsiniz.)`)) return;
+    await updateRecord(userId, 'invoices', inv.id, { status: 'cancelled' });
+  };
 
   const handleSave = async (payload) => {
     const dataToSave = {
@@ -122,6 +129,11 @@ export default function Invoices({ data, userId }) {
                           <button onClick={() => { setViewing(inv); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Eye size={15} className="mr-3" />Görüntüle</button>
                           <button onClick={() => { setEditing(inv); setFormOpen(true); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Edit size={15} className="mr-3" />Düzenle</button>
                           <button onClick={() => { setViewing(inv); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Send size={15} className="mr-3" />Yazdır / PDF</button>
+                          {inv.status === 'cancelled' ? (
+                            <button onClick={() => { updateRecord(userId, 'invoices', inv.id, { status: 'unpaid' }); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Ban size={15} className="mr-3" />İptali Geri Al</button>
+                          ) : (
+                            <button onClick={() => { cancelInvoice(inv); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-amber-600 hover:bg-gray-100"><Ban size={15} className="mr-3" />İptal Et</button>
+                          )}
                           <button onClick={() => { setConfirmId(inv.id); setMenuId(null); }} className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"><Trash2 size={15} className="mr-3" />Sil</button>
                         </div>
                       </>

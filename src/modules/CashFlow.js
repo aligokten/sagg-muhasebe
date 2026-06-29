@@ -1,4 +1,4 @@
-// --- Gelir & Gider ---
+// --- Gelir & Gider (kategori + cari ilişkili) ---
 import React, { useState, useMemo } from 'react';
 import { Edit, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
@@ -7,23 +7,26 @@ import {
   PageHeader, AddButton, Card, Table, Td, EmptyState, StatCard,
   FormModal, ConfirmDialog, Field, Input, Select,
 } from '../components/ui';
+import { CategorySelect } from '../categories';
 
-const expenseCategories = ['Ofis Malzemeleri', 'Personel', 'Kira', 'Pazarlama', 'Faturalar (Elektrik/Su/İnternet)', 'Yakıt/Ulaşım', 'Vergi/SGK', 'Bakım Onarım', 'Diğer'];
-const incomeCategories = ['Hizmet Geliri', 'Kira Geliri', 'Faiz Geliri', 'Komisyon', 'Diğer'];
-
-function EntryForm({ kind, existing, userId, accounts, onClose }) {
+function EntryForm({ kind, existing, userId, accounts, customers, projects, onClose }) {
   const isIncome = kind === 'incomes';
-  const cats = isIncome ? incomeCategories : expenseCategories;
   const [form, setForm] = useState(
-    existing || { date: todayInput(), category: cats[0], description: '', amount: '', vatRate: 20, accountId: accounts[0]?.id || '' }
+    existing || { date: todayInput(), category: '', description: '', amount: '', vatRate: 20, accountId: accounts[0]?.id || '', customerId: '', projectId: '' }
   );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const customerProjects = projects.filter((p) => p.customerId === form.customerId);
   const submit = async (e) => {
     e.preventDefault();
     if (!(Number(form.amount) > 0)) return;
+    const customer = customers.find((c) => c.id === form.customerId);
     const payload = {
       ...form, amount: Number(form.amount), vatRate: Number(form.vatRate) || 0,
-      accountId: form.accountId || null, date: Timestamp.fromDate(new Date(form.date)),
+      accountId: form.accountId || null,
+      customerId: form.customerId || null,
+      customerName: customer?.name || null,
+      projectId: form.projectId || null,
+      date: Timestamp.fromDate(new Date(form.date)),
     };
     delete payload.id;
     if (existing) await updateRecord(userId, kind, existing.id, payload);
@@ -31,21 +34,28 @@ function EntryForm({ kind, existing, userId, accounts, onClose }) {
     onClose();
   };
   return (
-    <FormModal title={`${existing ? 'Düzenle' : 'Yeni'} ${isIncome ? 'Gelir' : 'Gider'}`} onSubmit={submit} onClose={onClose}>
-      <div className="grid grid-cols-1 gap-4">
+    <FormModal title={`${existing ? 'Düzenle' : 'Yeni'} ${isIncome ? 'Gelir' : 'Gider'}`} size="lg" onSubmit={submit} onClose={onClose}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={set} required /></Field>
-        <Field label="Kategori"><Select name="category" value={form.category} onChange={set}>{cats.map((c) => <option key={c}>{c}</option>)}</Select></Field>
-        <Field label="Açıklama"><Input name="description" value={form.description} onChange={set} required /></Field>
+        <Field label="Kategori"><CategorySelect name="category" value={form.category} onChange={set} /></Field>
+        <Field label="Cari (opsiyonel)"><Select name="customerId" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, projectId: '' })}><option value="">Seçilmedi</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        {customerProjects.length > 0 ? (
+          <Field label="İş / Proje"><Select name="projectId" value={form.projectId} onChange={set}><option value="">Genel</option>{customerProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+        ) : <div />}
+        <Field label="Açıklama" className="md:col-span-2"><Input name="description" value={form.description} onChange={set} /></Field>
         <Field label="Tutar (KDV Dahil)"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
         <Field label="KDV %"><Select name="vatRate" value={form.vatRate} onChange={set}>{[0, 1, 10, 20].map((r) => <option key={r} value={r}>%{r}</option>)}</Select></Field>
-        <Field label="Kasa / Banka"><Select name="accountId" value={form.accountId} onChange={set}><option value="">Belirtilmedi</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+        <Field label="Kasa / Banka" className="md:col-span-2"><Select name="accountId" value={form.accountId} onChange={set}><option value="">Belirtilmedi</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
       </div>
+      {form.customerId && (
+        <p className="text-xs text-gray-400 mt-3">Bu kayıt seçili carinin hesap ekstresinde de görünecek ({isIncome ? 'alacak' : 'borç'} olarak).</p>
+      )}
     </FormModal>
   );
 }
 
 export default function CashFlow({ data, userId }) {
-  const { expenses = [], incomes = [], accounts = [] } = data;
+  const { expenses = [], incomes = [], accounts = [], customers = [], projects = [] } = data;
   const [tab, setTab] = useState('expenses');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -62,7 +72,7 @@ export default function CashFlow({ data, userId }) {
 
   return (
     <div>
-      <PageHeader title="Gelir & Gider" subtitle="Fatura dışı gelir ve giderleriniz">
+      <PageHeader title="Gelir & Gider" subtitle="Kategori ve cari ilişkili gelir/gider kayıtları">
         <AddButton label={isIncome ? 'Yeni Gelir' : 'Yeni Gider'} onClick={() => { setEditing(null); setFormOpen(true); }} />
       </PageHeader>
 
@@ -79,12 +89,13 @@ export default function CashFlow({ data, userId }) {
 
       <Card>
         {list.length === 0 ? <EmptyState message="Kayıt yok" /> : (
-          <Table headers={[{ label: 'Tarih' }, { label: 'Kategori' }, { label: 'Açıklama' }, { label: 'Hesap' }, { label: 'Tutar', align: 'right' }, { label: '' }]}>
+          <Table headers={[{ label: 'Tarih' }, { label: 'Kategori' }, { label: 'Açıklama' }, { label: 'Cari' }, { label: 'Hesap' }, { label: 'Tutar', align: 'right' }, { label: '' }]}>
             {list.map((x) => (
               <tr key={x.id} className="hover:bg-gray-50">
                 <Td className="text-gray-500">{formatDateShort(x.date)}</Td>
-                <Td className="text-gray-600">{x.category}</Td>
+                <Td className="text-gray-600">{x.category || '-'}</Td>
                 <Td className="font-medium text-gray-900">{x.description}</Td>
+                <Td className="text-gray-500">{x.customerName || '-'}</Td>
                 <Td className="text-gray-500">{accName(x.accountId)}</Td>
                 <Td align="right" className={`font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(x.amount)}</Td>
                 <Td align="right">
@@ -99,7 +110,7 @@ export default function CashFlow({ data, userId }) {
         )}
       </Card>
 
-      {formOpen && <EntryForm kind={tab} existing={editing} userId={userId} accounts={accounts} onClose={() => { setFormOpen(false); setEditing(null); }} />}
+      {formOpen && <EntryForm kind={tab} existing={editing} userId={userId} accounts={accounts} customers={customers} projects={projects} onClose={() => { setFormOpen(false); setEditing(null); }} />}
       {confirmId && <ConfirmDialog message="Bu kaydı silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, tab, confirmId)} onClose={() => setConfirmId(null)} />}
     </div>
   );

@@ -65,8 +65,8 @@ export default function Dashboard({ data, setPage }) {
   const accBalances = useMemo(() => allAccountBalances(data), [data]);
   const stocks = useMemo(() => allProductStocks(data), [data]);
 
-  const salesInv = useMemo(() => invoices.filter((i) => (i.type || 'sales') === 'sales'), [invoices]);
-  const purchInv = useMemo(() => invoices.filter((i) => i.type === 'purchase'), [invoices]);
+  const salesInv = useMemo(() => invoices.filter((i) => (i.type || 'sales') === 'sales' && i.status !== 'cancelled'), [invoices]);
+  const purchInv = useMemo(() => invoices.filter((i) => i.type === 'purchase' && i.status !== 'cancelled'), [invoices]);
 
   const totalIncome = sum(salesInv, (i) => i.grandTotal) + sum(incomes, (i) => i.amount);
   const totalExpense = sum(purchInv, (i) => i.grandTotal) + sum(expenses, (e) => e.amount);
