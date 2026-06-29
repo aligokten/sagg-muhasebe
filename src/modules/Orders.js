@@ -113,6 +113,7 @@ export default function Orders({ data, userId }) {
           customers={customers}
           products={products}
           projects={data.projects || []}
+          authors={data.authors || []}
           kind={kind}
           dateLabel="Sipariş Tarihi"
           secondDateLabel="Teslim Tarihi"

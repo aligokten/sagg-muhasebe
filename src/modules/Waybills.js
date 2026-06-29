@@ -107,6 +107,7 @@ export default function Waybills({ data, userId }) {
           customers={customers}
           products={products}
           projects={data.projects || []}
+          authors={data.authors || []}
           kind={kind}
           dateLabel="İrsaliye Tarihi"
           onClose={() => { setFormOpen(false); setEditing(null); }}

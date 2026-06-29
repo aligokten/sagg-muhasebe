@@ -124,6 +124,27 @@ export const allCariBalances = (data) => {
   return map;
 };
 
+// --- Müellif / taşeron (proje bazlı) hesaplamaları ---
+// Bir müellif atamasına (subcontract) yapılan toplam ödeme.
+export const subcontractPaid = (subcontractId, data) =>
+  (data.transactions || [])
+    .filter((t) => t.subcontractId === subcontractId)
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+// Bir müellif atamasının kalan borcu = sözleşme bedeli - ödenen.
+export const subcontractRemaining = (sc, data) =>
+  (Number(sc.agreedAmount) || 0) - subcontractPaid(sc.id, data);
+
+// Bir müellifin tüm projelerdeki toplam sözleşme / ödenen / kalan tutarı.
+export const authorTotals = (authorId, data) => {
+  const subs = (data.subcontracts || []).filter((s) => s.authorId === authorId);
+  const agreed = subs.reduce((s, x) => s + (Number(x.agreedAmount) || 0), 0);
+  const paid = (data.transactions || [])
+    .filter((t) => t.authorId === authorId)
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  return { agreed, paid, remaining: agreed - paid };
+};
+
 // Bir kasa/banka hesabının hareketleri ve bakiyesi.
 export const accountMovements = (accountId, data) => {
   const { accounts = [], transactions = [], expenses = [], incomes = [] } = data;

@@ -17,6 +17,7 @@ export default function DocumentForm({
   customers = [],
   products = [],
   projects = [],
+  authors = [],
   kind = 'sales',
   showStatus,
   statusOptions,
@@ -28,6 +29,7 @@ export default function DocumentForm({
   const [form, setForm] = useState(() => ({
     customerId: '',
     projectId: '',
+    authorId: '',
     docNumber: existing ? '' : nextDocNumber(records, numberPrefix, numberField),
     date: toInputDate(new Date()),
     dueDate: toInputDate(new Date()),
@@ -94,6 +96,7 @@ export default function DocumentForm({
       ...form,
       customerId: form.customerId,
       projectId: form.projectId || null,
+      authorId: form.authorId || null,
       customerSnapshot: customer,
       items: cleanItems,
       ...totals,
@@ -131,6 +134,16 @@ export default function DocumentForm({
                     <option value="">Genel (işe bağlı değil)</option>
                     {customerProjects.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+              {authors.length > 0 && (
+                <Field label="Müellif" className="lg:col-span-2">
+                  <Select name="authorId" value={form.authorId || ''} onChange={setField}>
+                    <option value="">Seçilmedi</option>
+                    {authors.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.branch})</option>
                     ))}
                   </Select>
                 </Field>
