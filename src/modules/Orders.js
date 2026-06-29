@@ -112,6 +112,7 @@ export default function Orders({ data, userId }) {
           records={orders.filter((o) => (o.type || 'sales') === kind)}
           customers={customers}
           products={products}
+          projects={data.projects || []}
           kind={kind}
           dateLabel="Sipariş Tarihi"
           secondDateLabel="Teslim Tarihi"

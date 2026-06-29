@@ -142,6 +142,7 @@ export default function Invoices({ data, userId }) {
           records={invoices.filter((i) => (i.type || 'sales') === kind)}
           customers={customers}
           products={products}
+          projects={data.projects || []}
           kind={kind}
           dateLabel="Fatura Tarihi"
           secondDateLabel="Vade Tarihi"

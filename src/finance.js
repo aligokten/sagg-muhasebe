@@ -8,27 +8,36 @@ const ts = (d) => {
   return x && !isNaN(x) ? x.getTime() : 0;
 };
 
-// Bir cari hesabın tüm hareketlerini (ekstre) ve bakiyesini döner.
+// Bir cari hesabın hareketlerini (ekstre) ve bakiyesini döner.
 // Bakiye = Borç - Alacak (pozitif => cari bize borçlu).
-export const cariMovements = (customerId, data) => {
-  const { invoices = [], transactions = [], customers = [], checks = [] } = data;
+// projectId verilirse yalnızca o işe/projeye ait hareketler döner
+// (açılış bakiyesi de o projenin açılışı olur). projectId null ise
+// carinin tüm hareketleri (tüm işler + işsiz kayıtlar) döner.
+export const cariMovements = (customerId, data, projectId = null) => {
+  const { invoices = [], transactions = [], customers = [], checks = [], projects = [] } = data;
   const customer = customers.find((c) => c.id === customerId);
+  const projName = (id) => projects.find((p) => p.id === id)?.name || '';
+  const matchProj = (rec) => (projectId == null ? true : (rec.projectId || null) === projectId);
   const rows = [];
 
-  if (customer && Number(customer.openingBalance)) {
-    const amt = Number(customer.openingBalance) || 0;
-    const isBorc = (customer.openingType || 'borc') === 'borc';
-    rows.push({
-      date: customer.openingDate || customer.createdAt,
-      type: 'Açılış',
-      description: 'Devir bakiyesi',
-      borc: isBorc ? amt : 0,
-      alacak: isBorc ? 0 : amt,
-    });
+  // Açılış bakiyesi
+  if (projectId == null) {
+    if (customer && Number(customer.openingBalance)) {
+      const amt = Number(customer.openingBalance) || 0;
+      const isBorc = (customer.openingType || 'borc') === 'borc';
+      rows.push({ date: customer.openingDate || customer.createdAt, type: 'Açılış', description: 'Devir bakiyesi', borc: isBorc ? amt : 0, alacak: isBorc ? 0 : amt, projectId: null, projectName: '' });
+    }
+  } else {
+    const proj = projects.find((p) => p.id === projectId);
+    if (proj && Number(proj.openingBalance)) {
+      const amt = Number(proj.openingBalance) || 0;
+      const isBorc = (proj.openingType || 'borc') === 'borc';
+      rows.push({ date: proj.openingDate || proj.createdAt, type: 'Açılış', description: 'İş açılış bakiyesi', borc: isBorc ? amt : 0, alacak: isBorc ? 0 : amt, projectId, projectName: proj.name });
+    }
   }
 
   invoices
-    .filter((i) => i.customerId === customerId)
+    .filter((i) => i.customerId === customerId && matchProj(i))
     .forEach((i) => {
       const isSales = i.type !== 'purchase';
       rows.push({
@@ -37,12 +46,14 @@ export const cariMovements = (customerId, data) => {
         description: `${i.docNumber || ''}`.trim(),
         borc: isSales ? Number(i.grandTotal) || 0 : 0,
         alacak: isSales ? 0 : Number(i.grandTotal) || 0,
+        projectId: i.projectId || null,
+        projectName: projName(i.projectId),
         ref: { kind: 'invoice', id: i.id },
       });
     });
 
   transactions
-    .filter((t) => t.customerId === customerId)
+    .filter((t) => t.customerId === customerId && matchProj(t))
     .forEach((t) => {
       const amt = Number(t.amount) || 0;
       let borc = 0;
@@ -58,11 +69,11 @@ export const cariMovements = (customerId, data) => {
         if (t.cariEffect === 'borc') borc = amt;
         else alacak = amt;
       }
-      rows.push({ date: t.date, type: 'Hareket', description: label, borc, alacak, ref: { kind: 'transaction', id: t.id } });
+      rows.push({ date: t.date, type: 'Hareket', description: label, borc, alacak, projectId: t.projectId || null, projectName: projName(t.projectId), ref: { kind: 'transaction', id: t.id } });
     });
 
   checks
-    .filter((c) => c.customerId === customerId)
+    .filter((c) => c.customerId === customerId && matchProj(c))
     .forEach((c) => {
       const amt = Number(c.amount) || 0;
       const received = c.direction === 'received';
@@ -72,6 +83,8 @@ export const cariMovements = (customerId, data) => {
         description: `${received ? 'Alınan' : 'Verilen'} ${c.serialNo || ''}`.trim(),
         borc: received ? 0 : amt,
         alacak: received ? amt : 0,
+        projectId: c.projectId || null,
+        projectName: projName(c.projectId),
         ref: { kind: 'check', id: c.id },
       });
     });
@@ -86,6 +99,21 @@ export const cariMovements = (customerId, data) => {
 };
 
 export const cariBalance = (customerId, data) => cariMovements(customerId, data).balance;
+
+// Bir işin/projenin bakiyesi ve hareketleri.
+export const projectMovements = (project, data) => cariMovements(project.customerId, data, project.id);
+export const projectBalance = (project, data) => projectMovements(project, data).balance;
+
+// Verilen cariye ait işlerin bakiyelerini hesaplar.
+export const customerProjectBalances = (customerId, data) => {
+  const map = {};
+  (data.projects || [])
+    .filter((p) => p.customerId === customerId)
+    .forEach((p) => {
+      map[p.id] = projectBalance(p, data);
+    });
+  return map;
+};
 
 // Tüm carilerin bakiyelerini tek seferde hesaplar (performanslı).
 export const allCariBalances = (data) => {

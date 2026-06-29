@@ -43,6 +43,24 @@ test('accountMovements giriş ve çıkışları toplar', () => {
   expect(accountMovements('a1', data).balance).toBe(400);
 });
 
+test('cariMovements proje filtresi yalnızca o işe ait hareketleri sayar', () => {
+  const data = {
+    customers: [{ id: 'c1', openingBalance: 0 }],
+    projects: [{ id: 'pr1', customerId: 'c1', name: 'Arsa A' }, { id: 'pr2', customerId: 'c1', name: 'Arsa B' }],
+    invoices: [
+      { id: 'i1', customerId: 'c1', projectId: 'pr1', type: 'sales', grandTotal: 1000, date: new Date() },
+      { id: 'i2', customerId: 'c1', projectId: 'pr2', type: 'sales', grandTotal: 500, date: new Date() },
+    ],
+    transactions: [{ id: 't1', customerId: 'c1', projectId: 'pr1', type: 'tahsilat', amount: 400, date: new Date() }],
+  };
+  // Genel bakiye: 1000 + 500 - 400 = 1100
+  expect(cariMovements('c1', data).balance).toBe(1100);
+  // Sadece Arsa A: 1000 - 400 = 600
+  expect(cariMovements('c1', data, 'pr1').balance).toBe(600);
+  // Sadece Arsa B: 500
+  expect(cariMovements('c1', data, 'pr2').balance).toBe(500);
+});
+
 test('productStock alış ve satışları hesaba katar', () => {
   const data = {
     products: [{ id: 'p1', openingStock: 10 }],
