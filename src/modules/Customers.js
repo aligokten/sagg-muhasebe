@@ -10,6 +10,7 @@ import {
 } from '../components/ui';
 import QuickEntry from '../components/QuickEntry';
 import { BRANCHES } from './Authors';
+import { CategorySelect } from '../categories';
 
 const balanceBadge = (bal) => {
   if (Math.abs(bal) < 0.01) return <Badge color="gray">Bakiye Yok</Badge>;
@@ -103,7 +104,7 @@ function PaymentForm({ type, customer, userId, accounts, projects, lockedProject
   const isCollect = type === 'tahsilat';
   const [form, setForm] = useState({
     date: todayInput(), amount: '', accountId: accounts[0]?.id || '',
-    method: 'Nakit', description: '', projectId: lockedProjectId || '',
+    method: 'Nakit', category: '', description: '', projectId: lockedProjectId || '',
   });
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const lockedProject = projects.find((p) => p.id === lockedProjectId);
@@ -116,7 +117,8 @@ function PaymentForm({ type, customer, userId, accounts, projects, lockedProject
         projectId: form.projectId || null,
         amount: Number(form.amount), accountId: form.accountId || null,
         direction: isCollect ? 'in' : 'out', method: form.method,
-        description: form.description || (isCollect ? 'Tahsilat' : 'Ödeme'),
+        category: form.category || null,
+        description: form.description || form.category || (isCollect ? 'Tahsilat' : 'Ödeme'),
         date: Timestamp.fromDate(new Date(form.date)),
       });
       onClose();
@@ -132,6 +134,7 @@ function PaymentForm({ type, customer, userId, accounts, projects, lockedProject
         ) : null}
         <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={set} required /></Field>
         <Field label="Tutar"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
+        <Field label="Kategori"><CategorySelect name="category" value={form.category} onChange={set} /></Field>
         <Field label="Kasa / Banka"><Select name="accountId" value={form.accountId} onChange={set}><option value="">Belirtilmedi</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
         <Field label="Ödeme Şekli"><Select name="method" value={form.method} onChange={set}><option>Nakit</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Çek</option><option>Senet</option></Select></Field>
         <Field label="Açıklama"><Input name="description" value={form.description} onChange={set} /></Field>
@@ -226,7 +229,10 @@ function LedgerTable({ rows, showProject }) {
         <tr key={i} className="hover:bg-gray-50">
           <Td className="text-gray-500">{formatDateShort(r.date)}</Td>
           <Td><Badge color={r.borc ? 'red' : 'green'}>{r.type}</Badge></Td>
-          <Td className="text-gray-600">{r.description}</Td>
+          <Td className="text-gray-600">
+            {r.description}
+            {r.category && <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs">{r.category}</span>}
+          </Td>
           {showProject && <Td className="text-gray-500">{r.projectName || <span className="text-gray-300">Genel</span>}</Td>}
           <Td align="right" className="text-red-600">{r.borc ? formatCurrency(r.borc) : '-'}</Td>
           <Td align="right" className="text-green-600">{r.alacak ? formatCurrency(r.alacak) : '-'}</Td>

@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { addRecord, Timestamp } from '../firebase';
 import { Input, Select } from './ui';
 import { todayInput } from '../utils';
+import { CategorySelect } from '../categories';
 
 const ACTIONS = [
   { key: 'satis', label: 'Satış', color: 'bg-gray-700' },
@@ -16,6 +17,7 @@ const ACTIONS = [
 export default function QuickEntry({ customer, projectId = null, userId, accounts = [] }) {
   const [action, setAction] = useState('tahsilat');
   const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [date, setDate] = useState(todayInput());
@@ -32,7 +34,8 @@ export default function QuickEntry({ customer, projectId = null, userId, account
       customerName: customer.name,
       projectId: projectId || null,
       amount: amt,
-      description: description || ACTIONS.find((a) => a.key === action).label,
+      category: category || null,
+      description: description || category || ACTIONS.find((a) => a.key === action).label,
       date: Timestamp.fromDate(new Date(date)),
     };
     let payload;
@@ -44,6 +47,7 @@ export default function QuickEntry({ customer, projectId = null, userId, account
       await addRecord(userId, 'transactions', payload);
       setAmount('');
       setDescription('');
+      setCategory('');
     } catch (e) {
       console.error(e);
       alert('Kayıt eklenemedi.');
@@ -65,22 +69,23 @@ export default function QuickEntry({ customer, projectId = null, userId, account
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-        <Input type="number" step="0.01" inputMode="decimal" placeholder="Tutar" value={amount} onChange={(e) => setAmount(e.target.value)} className="sm:col-span-3" />
-        <Input placeholder="Açıklama" value={description} onChange={(e) => setDescription(e.target.value)} className="sm:col-span-4" />
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:col-span-2" />
-        {needsAccount ? (
-          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="sm:col-span-2">
-            <option value="">Kasa/Banka</option>
-            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </Select>
-        ) : (
-          <div className="sm:col-span-2" />
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="w-full sm:w-28"><Input type="number" step="0.01" inputMode="decimal" placeholder="Tutar" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+        <div className="flex-1 min-w-[150px]"><CategorySelect value={category} onChange={(e) => setCategory(e.target.value)} /></div>
+        <div className="flex-1 min-w-[150px]"><Input placeholder="Açıklama (opsiyonel)" value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+        <div className="w-full sm:w-36"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+        {needsAccount && (
+          <div className="w-full sm:w-40">
+            <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              <option value="">Kasa/Banka</option>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </Select>
+          </div>
         )}
         <button
           onClick={save}
           disabled={saving || !(Number(amount) > 0)}
-          className="sm:col-span-1 flex items-center justify-center gap-1 bg-sky-600 text-white rounded-lg py-2 px-3 text-sm font-medium hover:bg-sky-700 disabled:opacity-40"
+          className="flex items-center justify-center gap-1 bg-sky-600 text-white rounded-lg py-2 px-4 text-sm font-medium hover:bg-sky-700 disabled:opacity-40 ml-auto"
         >
           <Check size={16} /> Kaydet
         </button>

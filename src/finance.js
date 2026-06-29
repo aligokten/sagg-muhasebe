@@ -69,7 +69,7 @@ export const cariMovements = (customerId, data, projectId = null) => {
         if (t.cariEffect === 'borc') borc = amt;
         else alacak = amt;
       }
-      rows.push({ date: t.date, type: 'Hareket', description: label, borc, alacak, projectId: t.projectId || null, projectName: projName(t.projectId), ref: { kind: 'transaction', id: t.id } });
+      rows.push({ date: t.date, type: 'Hareket', description: label, category: t.category || '', borc, alacak, projectId: t.projectId || null, projectName: projName(t.projectId), ref: { kind: 'transaction', id: t.id } });
     });
 
   checks
