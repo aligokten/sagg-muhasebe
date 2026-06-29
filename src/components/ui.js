@@ -1,6 +1,6 @@
 // --- Paylaşılan arayüz bileşenleri ---
-import React from 'react';
-import { X, PlusCircle, Inbox } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, PlusCircle, Inbox, MoreVertical } from 'lucide-react';
 
 export const Spinner = () => (
   <div className="flex items-center justify-center h-full py-20">
@@ -184,6 +184,42 @@ export const FormModal = ({ title, children, onSubmit, onClose, size = 'md', sub
     </div>
   </div>
 );
+
+// Satır işlemleri için dayanıklı eylem menüsü (ortalanmış action sheet).
+// items: [{ label, icon, onClick, danger, hidden }]
+export const ActionMenu = ({ items }) => {
+  const [open, setOpen] = useState(false);
+  const visible = (items || []).filter((it) => it && !it.hidden);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="p-2 rounded-full hover:bg-gray-200 text-gray-500"
+        aria-label="İşlemler"
+      >
+        <MoreVertical size={18} />
+      </button>
+      {open && (
+        <Modal title="İşlemler" size="sm" onClose={() => setOpen(false)}>
+          <div className="flex flex-col -my-1">
+            {visible.map((it, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => { setOpen(false); it.onClick && it.onClick(); }}
+                className={`flex items-center gap-3 px-3 py-3 text-sm text-left rounded-lg hover:bg-gray-100 ${it.danger ? 'text-red-600' : 'text-gray-700'}`}
+              >
+                {it.icon && <it.icon size={17} />}
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+};
 
 export const ConfirmDialog = ({ message, onConfirm, onClose }) => (
   <Modal
