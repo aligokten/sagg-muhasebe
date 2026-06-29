@@ -1,70 +1,73 @@
-# Getting Started with Create React App
+# SAGG Defter — Ön Muhasebe Uygulaması
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Defter.net benzeri, bulut tabanlı **ön muhasebe** uygulaması. React + Firebase (Firestore)
+ile geliştirilmiştir. Tüm veriler kullanıcıya özel olarak Firestore'da saklanır ve canlı
+olarak senkronize edilir.
 
-## Available Scripts
+## Özellikler
 
-In the project directory, you can run:
+### Satış & Alış
+- **Faturalar** — Satış ve alış faturaları, durum takibi (ödendi/kısmi/ödenmedi), yazdırma ve PDF
+- **Teklifler** — Teklif hazırlama, kabul/ret takibi, tek tıkla faturaya dönüştürme
+- **Siparişler** — Satış/alış siparişleri, teslim takibi, faturaya dönüştürme
+- **İrsaliyeler** — Sevk ve alış irsaliyeleri, faturaya dönüştürme
 
-### `npm start`
+### Kayıtlar
+- **Cari Hesaplar** — Müşteri/tedarikçi yönetimi, **hesap ekstresi**, borç/alacak bakiyesi,
+  tahsilat ve ödeme işlemleri
+- **Stok / Ürünler** — Ürün & hizmet kartları, **dinamik stok takibi**, stok hareketleri,
+  kritik stok uyarısı
+- **Personel** — Çalışan kartları ve maaş ödemesi
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Finans
+- **Kasa & Banka** — Hesap yönetimi, para giriş/çıkışı, **hesaplar arası virman**, hesap hareketleri
+- **Çek & Senet** — Alınan/verilen çek-senet portföyü, vade takibi, tahsil/ödeme
+- **Gelir & Gider** — Fatura dışı gelir ve giderler, KDV ayrımı
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Raporlar & Diğer
+- **Raporlar** — KDV raporu, aylık gelir/gider grafiği, gider dağılımı, cari yaşlandırma
+- **Gösterge Paneli** — Genel finansal özet, trend grafiği, uyarılar
+- **Ajanda** — Görev ve hatırlatıcılar
+- **Arsa Paylaştır** — Parsel bölme / arsa paylaştırma aracı
+- **Ayarlar** — Şirket profili ve fatura banka bilgileri
 
-### `npm test`
+## Muhasebe Motoru
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Bakiyeler kayıtlardan **dinamik olarak** türetilir (`src/finance.js`); böylece yazma anında
+veri tutarsızlığı oluşmaz:
 
-### `npm run build`
+- **Cari bakiye** = Açılış + Satış faturaları (borç) − Alış faturaları (alacak) ± Hareketler ± Çek/Senet
+- **Kasa/Banka bakiye** = Açılış + Girişler − Çıkışlar (tahsilat, ödeme, gelir, gider, virman)
+- **Stok** = Açılış + Alışlar − Satışlar ± Manuel hareketler
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Proje Yapısı
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```
+src/
+  firebase.js              Firebase yapılandırması ve CRUD veri katmanı
+  utils.js                 Biçimlendirme & hesaplama yardımcıları
+  finance.js               Bakiye/stok hesaplama motoru
+  components/
+    ui.js                  Paylaşılan arayüz bileşenleri (Modal, Table, Card...)
+    DocumentForm.js        Fatura/teklif/sipariş ortak belge formu
+    PrintView.js           Yazdırılabilir belge görünümü (yazdır + PDF)
+  modules/                 Dashboard, Customers, Products, Invoices, Quotes,
+                           Orders, Waybills, Accounts, Checks, CashFlow,
+                           Personnel, Reports, Agenda, Settings
+  ArsaPaylastir.js         Arsa paylaştırma modülü
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Kurulum
 
-### `npm run eject`
+```bash
+npm install
+npm start      # geliştirme sunucusu (http://localhost:3000)
+npm run build  # üretim derlemesi
+npm test       # testler
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Firebase Notu
+Uygulama anonim kimlik doğrulama kullanır. Firebase konsolundan
+**Authentication > Sign-in method > Anonymous** sağlayıcısının etkin olması gerekir.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+> Raporlar bilgilendirme amaçlıdır. Resmi beyanlar için mali müşavirinize danışınız.
