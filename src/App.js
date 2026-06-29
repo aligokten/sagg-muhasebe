@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
-  TrendingUp, Menu, X, AlertTriangle,
+  TrendingUp, Menu, X, AlertTriangle, DraftingCompass,
 } from 'lucide-react';
 
 import {
@@ -13,6 +13,7 @@ import { Spinner } from './components/ui';
 
 import Dashboard from './modules/Dashboard';
 import Customers from './modules/Customers';
+import Authors from './modules/Authors';
 import Products from './modules/Products';
 import Invoices from './modules/Invoices';
 import Quotes from './modules/Quotes';
@@ -29,7 +30,7 @@ import ArsaPaylastir from './ArsaPaylastir';
 
 // Dinlenecek koleksiyonlar
 const COLLECTIONS = [
-  'customers', 'projects', 'products', 'invoices', 'quotes', 'orders', 'waybills',
+  'customers', 'projects', 'authors', 'subcontracts', 'products', 'invoices', 'quotes', 'orders', 'waybills',
   'transactions', 'accounts', 'expenses', 'incomes', 'checks',
   'personnel', 'stockMovements', 'reminders',
 ];
@@ -55,6 +56,7 @@ const NAV_GROUPS = [
     title: 'Kayıtlar',
     items: [
       { id: 'customers', label: 'Cari Hesaplar', icon: Users },
+      { id: 'authors', label: 'Müellifler', icon: DraftingCompass },
       { id: 'products', label: 'Stok / Ürünler', icon: Package },
       { id: 'personnel', label: 'Personel', icon: UserCog },
     ],
@@ -207,6 +209,7 @@ export default function App() {
       case 'orders': return <Orders data={fullData} userId={userId} />;
       case 'waybills': return <Waybills data={fullData} userId={userId} />;
       case 'customers': return <Customers data={fullData} userId={userId} />;
+      case 'authors': return <Authors data={fullData} userId={userId} />;
       case 'products': return <Products data={fullData} userId={userId} />;
       case 'personnel': return <Personnel data={fullData} userId={userId} />;
       case 'accounts': return <Accounts data={fullData} userId={userId} />;

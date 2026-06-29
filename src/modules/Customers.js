@@ -1,13 +1,15 @@
 // --- Cari Hesaplar (müşteri / tedarikçi) + işler/projeler + ekstre + tahsilat/ödeme ---
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Edit, Trash2, Wallet, HandCoins, Printer, Users, Briefcase, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Wallet, HandCoins, Printer, Users, Briefcase, PlusCircle, DraftingCompass, Banknote } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput } from '../utils';
-import { cariMovements, allCariBalances, customerProjectBalances } from '../finance';
+import { cariMovements, allCariBalances, customerProjectBalances, subcontractPaid, subcontractRemaining } from '../finance';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
   FormModal, ConfirmDialog, Button, Field, Input, Select, Textarea,
 } from '../components/ui';
+import QuickEntry from '../components/QuickEntry';
+import { BRANCHES } from './Authors';
 
 const balanceBadge = (bal) => {
   if (Math.abs(bal) < 0.01) return <Badge color="gray">Bakiye Yok</Badge>;
@@ -138,6 +140,79 @@ function PaymentForm({ type, customer, userId, accounts, projects, lockedProject
   );
 }
 
+// --- Projeye müellif atama formu ---
+function SubcontractForm({ project, authors, userId, onClose }) {
+  const [form, setForm] = useState({ authorId: authors[0]?.id || '', branch: authors[0]?.branch || 'Mimari', agreedAmount: '', note: '' });
+  const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const onAuthor = (e) => {
+    const a = authors.find((x) => x.id === e.target.value);
+    setForm((f) => ({ ...f, authorId: e.target.value, branch: a?.branch || f.branch }));
+  };
+  const submit = async (e) => {
+    e.preventDefault();
+    const author = authors.find((a) => a.id === form.authorId);
+    if (!author) return alert('Müellif seçin.');
+    try {
+      await addRecord(userId, 'subcontracts', {
+        projectId: project.id, customerId: project.customerId,
+        authorId: author.id, authorName: author.name, branch: form.branch,
+        agreedAmount: Number(form.agreedAmount) || 0, note: form.note,
+      });
+      onClose();
+    } catch (err) { console.error(err); alert('Atama kaydedilemedi.'); }
+  };
+  if (authors.length === 0) {
+    return (
+      <FormModal title="Müellif Ata" onSubmit={(e) => { e.preventDefault(); onClose(); }} onClose={onClose} submitLabel="Kapat">
+        <p className="text-gray-600 text-sm">Önce <b>Müellifler</b> menüsünden mühendis/taşeron ekleyin, sonra buradan projeye atayabilirsiniz.</p>
+      </FormModal>
+    );
+  }
+  return (
+    <FormModal title={`Müellif Ata — ${project.name}`} onSubmit={submit} onClose={onClose}>
+      <div className="grid grid-cols-1 gap-4">
+        <Field label="Müellif"><Select name="authorId" value={form.authorId} onChange={onAuthor}>{authors.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.branch})</option>)}</Select></Field>
+        <Field label="Branş / İş"><Select name="branch" value={form.branch} onChange={set}>{BRANCHES.map((b) => <option key={b}>{b}</option>)}</Select></Field>
+        <Field label="Sözleşme Bedeli"><Input type="number" step="0.01" name="agreedAmount" value={form.agreedAmount} onChange={set} required /></Field>
+        <Field label="Not"><Input name="note" value={form.note} onChange={set} /></Field>
+      </div>
+    </FormModal>
+  );
+}
+
+// --- Müellife ödeme formu ---
+function AuthorPaymentForm({ subcontract, userId, accounts, onClose }) {
+  const remaining = subcontract._remaining ?? 0;
+  const [form, setForm] = useState({ amount: '', date: todayInput(), accountId: accounts[0]?.id || '', description: '' });
+  const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!(Number(form.amount) > 0)) return;
+    try {
+      await addRecord(userId, 'transactions', {
+        type: 'odeme', direction: 'out',
+        authorId: subcontract.authorId, authorName: subcontract.authorName,
+        subcontractId: subcontract.id, projectId: subcontract.projectId,
+        amount: Number(form.amount), accountId: form.accountId || null,
+        description: form.description || `Müellif ödemesi - ${subcontract.authorName}`,
+        date: Timestamp.fromDate(new Date(form.date)),
+      });
+      onClose();
+    } catch (err) { console.error(err); alert('Ödeme kaydedilemedi.'); }
+  };
+  return (
+    <FormModal title={`Müellif Ödemesi — ${subcontract.authorName}`} onSubmit={submit} onClose={onClose}>
+      <div className="grid grid-cols-1 gap-4">
+        <div className="text-sm bg-gray-50 rounded-md p-2 text-gray-600">Kalan borç: <b className="text-red-600">{formatCurrency(remaining)}</b></div>
+        <Field label="Tutar"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
+        <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={set} /></Field>
+        <Field label="Ödeme Hesabı"><Select name="accountId" value={form.accountId} onChange={set}><option value="">Belirtilmedi</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+        <Field label="Açıklama"><Input name="description" value={form.description} onChange={set} /></Field>
+      </div>
+    </FormModal>
+  );
+}
+
 // --- Ekstre tablosu (cari ya da proje) ---
 function LedgerTable({ rows, showProject }) {
   const headers = [
@@ -162,14 +237,27 @@ function LedgerTable({ rows, showProject }) {
   );
 }
 
-// --- İş / Proje detay (proje bazlı ekstre) ---
+// --- İş / Proje detay (proje bazlı ekstre + müellifler) ---
 function ProjectLedger({ customer, project, data, userId, onBack }) {
-  const { accounts = [], projects = [] } = data;
-  const [payment, setPayment] = useState(null);
+  const { accounts = [], authors = [] } = data;
   const [editOpen, setEditOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+  const [payFor, setPayFor] = useState(null);
+  const [confirmSubId, setConfirmSubId] = useState(null);
+
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data, project.id), [customer, project, data]);
   const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
   const totalAlacak = rows.reduce((s, r) => s + r.alacak, 0);
+
+  const subs = useMemo(
+    () => (data.subcontracts || [])
+      .filter((s) => s.projectId === project.id)
+      .map((s) => ({ ...s, _paid: subcontractPaid(s.id, data), _remaining: subcontractRemaining(s, data) })),
+    [data, project.id]
+  );
+  const subAgreed = subs.reduce((s, x) => s + (Number(x.agreedAmount) || 0), 0);
+  const subPaid = subs.reduce((s, x) => s + x._paid, 0);
+  const subRemaining = subAgreed - subPaid;
 
   return (
     <div>
@@ -180,25 +268,58 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
           <p className="text-sm text-gray-500 mt-1">{customer.name}{project.address ? ` · ${project.address}` : ''}</p>
           {project.description && <p className="text-sm text-gray-500 mt-1">{project.description}</p>}
         </div>
-        <div className="flex gap-2 items-start flex-wrap">
-          <Button icon={Wallet} variant="success" onClick={() => setPayment('tahsilat')}>Tahsilat</Button>
-          <Button icon={HandCoins} variant="danger" onClick={() => setPayment('odeme')}>Ödeme</Button>
-          <Button icon={Edit} variant="secondary" onClick={() => setEditOpen(true)}>Düzenle</Button>
-        </div>
+        <Button icon={Edit} variant="secondary" onClick={() => setEditOpen(true)}>İşi Düzenle</Button>
       </div>
+
+      {/* Hızlı kayıt çubuğu (işe işlenir) */}
+      <QuickEntry customer={customer} projectId={project.id} userId={userId} accounts={accounts} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Toplam Borç" value={formatCurrency(totalBorc)} color="text-red-600" />
-        <StatCard title="Toplam Alacak" value={formatCurrency(totalAlacak)} color="text-green-600" />
-        <StatCard title="İş Bakiyesi" value={balanceText(balance)} color={balance >= 0 ? 'text-red-600' : 'text-green-600'} />
+        <StatCard title="Müşteriye Kestiğimiz (Borç)" value={formatCurrency(totalBorc)} color="text-red-600" />
+        <StatCard title="Müşteriden Tahsil (Alacak)" value={formatCurrency(totalAlacak)} color="text-green-600" />
+        <StatCard title="Müşteri Bakiyesi" value={balanceText(balance)} color={balance >= 0 ? 'text-red-600' : 'text-green-600'} />
       </div>
 
-      <Card title="İş Ekstresi">
+      {/* Müellifler / Taşeronlar */}
+      <Card title="Müellifler / Taşeronlar" className="mb-6" actions={<Button icon={PlusCircle} onClick={() => setSubOpen(true)}>Müellif Ata</Button>}>
+        {subs.length === 0 ? (
+          <EmptyState message="Bu işe atanmış müellif yok. Taşere edeceğiniz branşlar için müellif atayın." icon={DraftingCompass} />
+        ) : (
+          <>
+            <Table headers={[{ label: 'Müellif' }, { label: 'Branş' }, { label: 'Sözleşme', align: 'right' }, { label: 'Ödenen', align: 'right' }, { label: 'Kalan', align: 'right' }, { label: '' }]}>
+              {subs.map((s) => (
+                <tr key={s.id} className="hover:bg-gray-50">
+                  <Td className="font-medium text-gray-900">{s.authorName}</Td>
+                  <Td><Badge color="purple">{s.branch}</Badge></Td>
+                  <Td align="right" className="text-gray-700">{formatCurrency(s.agreedAmount)}</Td>
+                  <Td align="right" className="text-green-600">{formatCurrency(s._paid)}</Td>
+                  <Td align="right" className={`font-semibold ${s._remaining > 0.01 ? 'text-red-600' : 'text-gray-500'}`}>{formatCurrency(s._remaining)}</Td>
+                  <Td align="right">
+                    <div className="flex justify-end gap-1">
+                      <button title="Ödeme yap" onClick={() => setPayFor(s)} className="p-2 rounded-full hover:bg-gray-200 text-green-600"><Banknote size={16} /></button>
+                      <button title="Atamayı sil" onClick={() => setConfirmSubId(s.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </Table>
+            <div className="flex flex-wrap gap-6 justify-end px-4 py-3 border-t text-sm">
+              <span className="text-gray-500">Toplam Sözleşme: <b className="text-gray-800">{formatCurrency(subAgreed)}</b></span>
+              <span className="text-gray-500">Ödenen: <b className="text-green-600">{formatCurrency(subPaid)}</b></span>
+              <span className="text-gray-500">Kalan Borç: <b className="text-red-600">{formatCurrency(subRemaining)}</b></span>
+            </div>
+          </>
+        )}
+      </Card>
+
+      <Card title="Müşteri Hesap Ekstresi (bu iş)">
         {rows.length === 0 ? <EmptyState message="Bu iş için henüz hareket yok" /> : <LedgerTable rows={rows} showProject={false} />}
       </Card>
 
-      {payment && <PaymentForm type={payment === 'tahsilat' ? 'tahsilat' : 'odeme'} customer={customer} userId={userId} accounts={accounts} projects={projects.filter((p) => p.customerId === customer.id)} lockedProjectId={project.id} onClose={() => setPayment(null)} />}
       {editOpen && <ProjectForm customerId={customer.id} existing={project} userId={userId} onClose={() => setEditOpen(false)} />}
+      {subOpen && <SubcontractForm project={project} authors={authors} userId={userId} onClose={() => setSubOpen(false)} />}
+      {payFor && <AuthorPaymentForm subcontract={payFor} userId={userId} accounts={accounts} onClose={() => setPayFor(null)} />}
+      {confirmSubId && <ConfirmDialog message="Bu müellif atamasını silmek istediğinize emin misiniz? (Yapılan ödemeler silinmez.)" onConfirm={() => deleteRecord(userId, 'subcontracts', confirmSubId)} onClose={() => setConfirmSubId(null)} />}
     </div>
   );
 }
@@ -245,6 +366,9 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         <StatCard title="Toplam Alacak" value={formatCurrency(totalAlacak)} color="text-green-600" />
         <StatCard title="Genel Bakiye" value={balanceText(balance)} color={balance >= 0 ? 'text-red-600' : 'text-green-600'} />
       </div>
+
+      {/* Hızlı kayıt çubuğu */}
+      <QuickEntry customer={customer} userId={userId} accounts={accounts} />
 
       {/* İşler / Projeler */}
       <Card title="İşler / Projeler" className="mb-6" actions={<Button icon={PlusCircle} onClick={() => setProjectFormOpen(true)}>Yeni İş</Button>}>

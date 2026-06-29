@@ -143,6 +143,7 @@ export default function Invoices({ data, userId }) {
           customers={customers}
           products={products}
           projects={data.projects || []}
+          authors={data.authors || []}
           kind={kind}
           dateLabel="Fatura Tarihi"
           secondDateLabel="Vade Tarihi"

@@ -120,6 +120,7 @@ export default function Quotes({ data, userId }) {
           customers={customers}
           products={products}
           projects={data.projects || []}
+          authors={data.authors || []}
           kind="sales"
           dateLabel="Teklif Tarihi"
           secondDateLabel="Geçerlilik Tarihi"
