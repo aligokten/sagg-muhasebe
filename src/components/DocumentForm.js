@@ -16,6 +16,7 @@ export default function DocumentForm({
   records = [],
   customers = [],
   products = [],
+  projects = [],
   kind = 'sales',
   showStatus,
   statusOptions,
@@ -26,6 +27,7 @@ export default function DocumentForm({
 }) {
   const [form, setForm] = useState(() => ({
     customerId: '',
+    projectId: '',
     docNumber: existing ? '' : nextDocNumber(records, numberPrefix, numberField),
     date: toInputDate(new Date()),
     dueDate: toInputDate(new Date()),
@@ -33,6 +35,8 @@ export default function DocumentForm({
     note: '',
     status: statusOptions ? statusOptions[0].value : undefined,
   }));
+
+  const customerProjects = projects.filter((p) => p.customerId === form.customerId);
 
   useEffect(() => {
     if (existing) {
@@ -89,6 +93,7 @@ export default function DocumentForm({
     onSave({
       ...form,
       customerId: form.customerId,
+      projectId: form.projectId || null,
       customerSnapshot: customer,
       items: cleanItems,
       ...totals,
@@ -108,13 +113,28 @@ export default function DocumentForm({
           <div className="p-5">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <Field label={kind === 'purchase' ? 'Tedarikçi' : 'Cari Hesap'} className="lg:col-span-2">
-                <Select name="customerId" value={form.customerId} onChange={setField} required>
+                <Select
+                  name="customerId"
+                  value={form.customerId}
+                  onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value, projectId: '' }))}
+                  required
+                >
                   <option value="">Seçiniz...</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </Select>
               </Field>
+              {customerProjects.length > 0 && (
+                <Field label="İş / Proje" className="lg:col-span-2">
+                  <Select name="projectId" value={form.projectId || ''} onChange={setField}>
+                    <option value="">Genel (işe bağlı değil)</option>
+                    {customerProjects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
               <Field label="Belge No">
                 <Input name="docNumber" value={form.docNumber} onChange={setField} required />
               </Field>

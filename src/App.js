@@ -29,7 +29,7 @@ import ArsaPaylastir from './ArsaPaylastir';
 
 // Dinlenecek koleksiyonlar
 const COLLECTIONS = [
-  'customers', 'products', 'invoices', 'quotes', 'orders', 'waybills',
+  'customers', 'projects', 'products', 'invoices', 'quotes', 'orders', 'waybills',
   'transactions', 'accounts', 'expenses', 'incomes', 'checks',
   'personnel', 'stockMovements', 'reminders',
 ];

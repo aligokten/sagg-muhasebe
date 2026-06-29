@@ -106,6 +106,7 @@ export default function Waybills({ data, userId }) {
           records={waybills.filter((w) => (w.type || 'sales') === kind)}
           customers={customers}
           products={products}
+          projects={data.projects || []}
           kind={kind}
           dateLabel="İrsaliye Tarihi"
           onClose={() => { setFormOpen(false); setEditing(null); }}
