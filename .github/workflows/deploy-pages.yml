@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
+      - main
       - claude/defter-app-clone-60gaoh
   workflow_dispatch:
 
