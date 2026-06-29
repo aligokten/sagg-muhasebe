@@ -1,178 +1,236 @@
-import React, { useState, useEffect, useMemo, useRef, forwardRef } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { LayoutDashboard, Receipt, ShoppingCart, BarChart3, Settings, PlusCircle, X, Users, Package, Landmark, Printer, Eye, Edit, Send, MoreVertical, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Ruler } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
+  Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
+  TrendingUp, Menu, X, AlertTriangle,
+} from 'lucide-react';
+
+import {
+  auth, signInAnonymously, onAuthStateChanged,
+  subscribeCollection, subscribeDoc, setRecord,
+} from './firebase';
+import { Spinner } from './components/ui';
+
+import Dashboard from './modules/Dashboard';
+import Customers from './modules/Customers';
+import Products from './modules/Products';
+import Invoices from './modules/Invoices';
+import Quotes from './modules/Quotes';
+import Orders from './modules/Orders';
+import Waybills from './modules/Waybills';
+import Accounts from './modules/Accounts';
+import Checks from './modules/Checks';
+import CashFlow from './modules/CashFlow';
+import Personnel from './modules/Personnel';
+import Reports from './modules/Reports';
+import Agenda from './modules/Agenda';
+import Settings from './modules/Settings';
 import ArsaPaylastir from './ArsaPaylastir';
 
-// Firebase Imports
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, addDoc, onSnapshot, doc, query, Timestamp, setDoc, updateDoc } from 'firebase/firestore';
+// Dinlenecek koleksiyonlar
+const COLLECTIONS = [
+  'customers', 'products', 'invoices', 'quotes', 'orders', 'waybills',
+  'transactions', 'accounts', 'expenses', 'incomes', 'checks',
+  'personnel', 'stockMovements', 'reminders',
+];
 
-// --- Firebase Configuration ---
-// Bu bilgiler sizin Firebase projenizden alınmıştır.
-const firebaseConfig = {
-  apiKey: "AIzaSyB3UzsOhB0u8kvha-kPioQX6YYRrOhEAvk",
-  authDomain: "sagg-muhasebe.firebaseapp.com",
-  projectId: "sagg-muhasebe",
-  storageBucket: "sagg-muhasebe.firebasestorage.app",
-  messagingSenderId: "453864948612",
-  appId: "1:453864948612:web:5736e59e08a10d524353d1",
-  measurementId: "G-PM7WXNEQG9"
-};
+const NAV_GROUPS = [
+  {
+    title: 'Genel',
+    items: [
+      { id: 'dashboard', label: 'Gösterge Paneli', icon: LayoutDashboard },
+      { id: 'agenda', label: 'Ajanda', icon: CalendarClock },
+    ],
+  },
+  {
+    title: 'Satış & Alış',
+    items: [
+      { id: 'invoices', label: 'Faturalar', icon: Receipt },
+      { id: 'quotes', label: 'Teklifler', icon: FileText },
+      { id: 'orders', label: 'Siparişler', icon: ClipboardList },
+      { id: 'waybills', label: 'İrsaliyeler', icon: Truck },
+    ],
+  },
+  {
+    title: 'Kayıtlar',
+    items: [
+      { id: 'customers', label: 'Cari Hesaplar', icon: Users },
+      { id: 'products', label: 'Stok / Ürünler', icon: Package },
+      { id: 'personnel', label: 'Personel', icon: UserCog },
+    ],
+  },
+  {
+    title: 'Finans',
+    items: [
+      { id: 'accounts', label: 'Kasa & Banka', icon: Landmark },
+      { id: 'checks', label: 'Çek & Senet', icon: ScrollText },
+      { id: 'cashflow', label: 'Gelir & Gider', icon: TrendingUp },
+    ],
+  },
+  {
+    title: 'Diğer',
+    items: [
+      { id: 'reports', label: 'Raporlar', icon: BarChart3 },
+      { id: 'arsapay', label: 'Arsa Paylaştır', icon: Ruler },
+      { id: 'settings', label: 'Ayarlar', icon: SettingsIcon },
+    ],
+  },
+];
 
-// --- App Initialization (Tek ve Doğru Blok) ---
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = 'sagg-muhasebe-app'; // App ID'yi burada sabit olarak tanımlıyoruz.
-
-// --- Helper Functions ---
-const formatCurrency = (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value || 0);
-const formatDate = (date) => {
-    if (!date) return 'Geçersiz Tarih';
-    const d = date instanceof Timestamp ? date.toDate() : new Date(date);
-    return d.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
-};
-function numberToWordsTr(num) {
-    if (num === null || num === undefined) return "";
-    if (num === 0) return "Sıfır";
-    const birler=["","Bir","İki","Üç","Dört","Beş","Altı","Yedi","Sekiz","Dokuz"],onlar=["","On","Yirmi","Otuz","Kırk","Elli","Altmış","Yetmiş","Seksen","Doksan"],binler=["","Bin","Milyon","Milyar"];
-    const groupToWords=(n)=>{let y=Math.floor(n/100),o=Math.floor((n%100)/10),b=n%10,r="";if(y>0)r+=(y>1?birler[y]:"")+"Yüz ";if(o>0)r+=onlar[o]+" ";if(b>0)r+=birler[b]+" ";return r};let p=num.toString().split('.'),i=parseInt(p[0],10),f=p.length>1?parseInt(p[1].padEnd(2,'0').substring(0,2),10):0;let w="";if(i===0){w="Sıfır "}else{let j=0;while(i>0){let c=i%1000;if(c>0){let cw=groupToWords(c);if(j===1&&c===1)cw="";w=cw+binler[j]+" "+w}i=Math.floor(i/1000);j++}}let res=w.trim()+" Türk Lirası";if(f>0)res+=", "+groupToWords(f).trim()+" Kuruş";return res
-}
-
-// --- Loading Spinner Component ---
-const Spinner = () => (
-    <div className="flex items-center justify-center h-full">
-        <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-sky-500"></div>
-    </div>
+const Sidebar = ({ currentPage, setCurrentPage, userId, mobileOpen, setMobileOpen }) => (
+  <>
+    {mobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
+    <nav className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-gray-800 text-white flex flex-col no-print transform transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700 flex-shrink-0">
+        <div className="flex items-center">
+          <span className="text-2xl font-bold text-sky-400">S</span>
+          <h1 className="text-lg font-bold ml-2 tracking-wide">SAGG Defter</h1>
+        </div>
+        <button className="md:hidden text-gray-400" onClick={() => setMobileOpen(false)}><X size={20} /></button>
+      </div>
+      <div className="flex-1 overflow-y-auto py-4">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.title} className="mb-3">
+            <p className="px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{group.title}</p>
+            <ul>
+              {group.items.map((item) => (
+                <li key={item.id} className="px-2">
+                  <button
+                    onClick={() => { setCurrentPage(item.id); setMobileOpen(false); }}
+                    className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === item.id ? 'bg-sky-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                  >
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    <span className="ml-3 font-medium">{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="p-3 border-t border-gray-700">
+        <p className="text-xs text-gray-500">Kullanıcı ID</p>
+        <p className="text-xs text-gray-400 break-all mt-0.5">{userId}</p>
+      </div>
+    </nav>
+  </>
 );
 
-// --- Main App Component ---
 export default function App() {
-    const [userId, setUserId] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [authError, setAuthError] = useState(null);
-    const [scriptsLoaded, setScriptsLoaded] = useState(false);
-    const [currentPage, setCurrentPage] = useState('dashboard');
-    const [data, setData] = useState({ invoices: [], expenses: [], customers: [], products: [], accounts: [], companyProfile: { companyName: "", address: "", bankAccounts: [] } });
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  const [scriptsLoaded, setScriptsLoaded] = useState(false);
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-    useEffect(() => {
-        const loadScript = (src) => new Promise((res, rej) => {
-            if(document.querySelector(`script[src="${src}"]`)) return res();
-            const script = document.createElement('script');
-            script.src = src; script.async = true;
-            script.onload = res; script.onerror = rej;
-            document.head.appendChild(script);
-        });
-        Promise.all([
-            loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
-            loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-        ]).then(() => setScriptsLoaded(true)).catch(err => console.error("PDF libraries failed to load", err));
-        
-        const unsubAuth = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                setUserId(user.uid);
-            } else {
-                try {
-                   await signInAnonymously(auth);
-                } catch (error) {
-                    if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
-                        setAuthError("Firebase projenizde kimlik doğrulama yapılandırılmamış. Lütfen Firebase konsolundan Authentication > Sign-in method sekmesine gidin ve 'Anonymous' (Anonim) sağlayıcısını etkinleştirin.");
-                    } else {
-                        setAuthError("Kimlik doğrulanırken bir hata oluştu: " + error.message);
-                    }
-                    console.error("Authentication Error:", error); 
-                    setLoading(false); 
-                }
-            }
-        });
-        return () => unsubAuth();
-    }, []);
+  const emptyData = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
+  const [data, setData] = useState({ ...emptyData, companyProfile: { companyName: '', address: '', bankAccounts: [] } });
 
-    useEffect(() => {
-        if (!userId) {
-            return;
+  // PDF kütüphanelerini yükle + kimlik doğrulama
+  useEffect(() => {
+    const loadScript = (src) =>
+      new Promise((res, rej) => {
+        if (document.querySelector(`script[src="${src}"]`)) return res();
+        const s = document.createElement('script');
+        s.src = src; s.async = true; s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    Promise.all([
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
+    ]).then(() => setScriptsLoaded(true)).catch((e) => console.error('PDF kütüphaneleri yüklenemedi', e));
+
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
+            setAuthError("Firebase projenizde kimlik doğrulama yapılandırılmamış. Lütfen Firebase konsolundan Authentication > Sign-in method sekmesine gidip 'Anonymous' sağlayıcısını etkinleştirin.");
+          } else {
+            setAuthError('Kimlik doğrulanırken bir hata oluştu: ' + error.message);
+          }
+          setLoading(false);
         }
-        setLoading(true);
-        const collectionsToFetch = ['invoices', 'expenses', 'customers', 'products', 'accounts'];
-        const unsubscribers = collectionsToFetch.map(colName => {
-            const path = `artifacts/${appId}/users/${userId}/${colName}`;
-            const q = query(collection(db, path));
-            return onSnapshot(q, snap => {
-                setData(prev => ({ ...prev, [colName]: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
-            }, err => console.error(`Error fetching ${colName}:`, err));
-        });
-        const profileRef = doc(db, `artifacts/${appId}/users/${userId}/companyProfile`, 'main');
-        const unsubProfile = onSnapshot(profileRef, async (docSnap) => {
-            if (docSnap.exists()) {
-                setData(prev => ({ ...prev, companyProfile: docSnap.data() }));
-            } else {
-                const defaultProfile = { companyName: "Şirket Adınız", address: "Adresiniz", bankAccounts: [{ bankName: "Banka Adı", iban: "TR..." }] };
-                await setDoc(profileRef, defaultProfile);
-                setData(prev => ({ ...prev, companyProfile: defaultProfile }));
-            }
-        });
-        unsubscribers.push(unsubProfile);
-        setLoading(false);
-        return () => unsubscribers.forEach(unsub => unsub());
-    }, [userId]);
+      }
+    });
+    return () => unsub();
+  }, []);
 
-    if (authError) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-red-50 text-red-900 p-8">
-                <div className="text-center max-w-2xl">
-                    <AlertTriangle className="mx-auto h-12 w-12 text-red-400" />
-                    <h2 className="mt-4 text-2xl font-bold">Yapılandırma Hatası</h2>
-                    <p className="mt-2">{authError}</p>
-                    <p className="mt-4 text-sm text-red-700">Bu ayarı yaptıktan sonra sayfayı yenilemeniz gerekmektedir.</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (loading) {
-        return <div className="flex items-center justify-center h-screen bg-gray-100"><Spinner /></div>;
-    }
-    
-    if (!userId && !loading) {
-         return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold text-gray-700">Kimlik doğrulama bekleniyor...</div></div>;
-    }
-
-    const renderPage = () => {
-        const { invoices, expenses, customers, products, accounts, companyProfile } = data;
-        switch (currentPage) {
-            case 'invoices': return <Invoices invoices={invoices} userId={userId} customers={customers} products={products} companyProfile={companyProfile} scriptsLoaded={scriptsLoaded}/>;
-            case 'customers': return <Customers customers={customers} userId={userId} />;
-            case 'products': return <Products products={products} userId={userId} />;
-            case 'expenses': return <Expenses expenses={expenses} userId={userId} accounts={accounts} />;
-            case 'accounts': return <BankAccounts accounts={accounts} userId={userId} />;
-            case 'reports': return <Reports invoices={invoices} expenses={expenses} />;
-            case 'arsapay': return <ArsaPaylastir />;
-            case 'settings': return <SettingsPage userId={userId} companyProfile={companyProfile} />;
-            default: return <Dashboard invoices={invoices} expenses={expenses} customers={customers} products={products} />;
+  // Tüm koleksiyonları ve şirket profilini dinle
+  useEffect(() => {
+    if (!userId) return;
+    setLoading(true);
+    const unsubs = COLLECTIONS.map((name) =>
+      subscribeCollection(userId, name, (docs) => setData((prev) => ({ ...prev, [name]: docs })))
+    );
+    unsubs.push(
+      subscribeDoc(
+        userId, 'companyProfile', 'main',
+        (d) => setData((prev) => ({ ...prev, companyProfile: d })),
+        () => {
+          const def = { companyName: 'Şirket Adınız', address: '', bankAccounts: [{ bankName: '', iban: '' }] };
+          setRecord(userId, 'companyProfile', 'main', def);
         }
-    };
-    return (<div className="flex h-screen bg-gray-100 font-sans"><Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} userId={userId} /><main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main></div>);
+      )
+    );
+    setLoading(false);
+    return () => unsubs.forEach((u) => u && u());
+  }, [userId]);
+
+  if (authError) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-red-50 text-red-900 p-8">
+        <div className="text-center max-w-2xl">
+          <AlertTriangle className="mx-auto h-12 w-12 text-red-400" />
+          <h2 className="mt-4 text-2xl font-bold">Yapılandırma Hatası</h2>
+          <p className="mt-2">{authError}</p>
+          <p className="mt-4 text-sm text-red-700">Bu ayarı yaptıktan sonra sayfayı yenilemeniz gerekmektedir.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !userId) {
+    return <div className="flex items-center justify-center h-screen bg-gray-100"><Spinner /></div>;
+  }
+
+  const fullData = { ...data, scriptsLoaded };
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'invoices': return <Invoices data={fullData} userId={userId} />;
+      case 'quotes': return <Quotes data={fullData} userId={userId} />;
+      case 'orders': return <Orders data={fullData} userId={userId} />;
+      case 'waybills': return <Waybills data={fullData} userId={userId} />;
+      case 'customers': return <Customers data={fullData} userId={userId} />;
+      case 'products': return <Products data={fullData} userId={userId} />;
+      case 'personnel': return <Personnel data={fullData} userId={userId} />;
+      case 'accounts': return <Accounts data={fullData} userId={userId} />;
+      case 'checks': return <Checks data={fullData} userId={userId} />;
+      case 'cashflow': return <CashFlow data={fullData} userId={userId} />;
+      case 'reports': return <Reports data={fullData} />;
+      case 'agenda': return <Agenda data={fullData} userId={userId} />;
+      case 'arsapay': return <ArsaPaylastir />;
+      case 'settings': return <Settings userId={userId} companyProfile={data.companyProfile} />;
+      default: return <Dashboard data={fullData} setPage={setCurrentPage} />;
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-100 font-sans">
+      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} userId={userId} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="md:hidden flex items-center justify-between h-14 px-4 bg-white border-b no-print">
+          <button onClick={() => setMobileOpen(true)} className="text-gray-600"><Menu /></button>
+          <span className="font-bold text-gray-800">SAGG Defter</span>
+          <span className="w-6" />
+        </header>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
+      </div>
+    </div>
+  );
 }
-
-// --- Other Components ---
-const Sidebar = ({ currentPage, setCurrentPage, userId }) => { const navItems = [{ id: 'dashboard', label: 'Gösterge Paneli', icon: LayoutDashboard },{ id: 'invoices', label: 'Faturalar', icon: Receipt },{ id: 'expenses', label: 'Giderler', icon: ShoppingCart },{ id: 'customers', label: 'Cari Hesaplar', icon: Users },{ id: 'products', label: 'Ürün/Hizmetler', icon: Package },{ id: 'accounts', label: 'Kasa/Banka', icon: Landmark },{ id: 'reports', label: 'Raporlar', icon: BarChart3 },{ id: 'arsapay', label: 'Arsa Paylaştır', icon: Ruler },{ id: 'settings', label: 'Ayarlar', icon: Settings }]; return (<nav className="w-16 md:w-64 bg-gray-800 text-white flex flex-col no-print"><div className="flex items-center justify-center md:justify-start h-16 px-4 border-b border-gray-700"><span className="text-2xl font-bold text-sky-400">S</span><h1 className="hidden md:block text-xl font-bold ml-3 tracking-wider">SAGG</h1></div><ul className="flex-1 mt-6">{navItems.map(item => (<li key={item.id} className="my-1 px-2"><button onClick={() => setCurrentPage(item.id)} className={`flex items-center w-full p-3 rounded-lg transition-colors duration-200 ${currentPage===item.id?'bg-sky-500 text-white shadow-md':'text-gray-300 hover:bg-gray-700 hover:text-white'}`}><item.icon className="h-6 w-6"/><span className="hidden md:inline ml-4 font-medium">{item.label}</span></button></li>))}</ul><div className="p-4 border-t border-gray-700 text-center"><p className="text-xs text-gray-400">Kullanıcı ID</p><p className="text-xs text-gray-400 break-words mt-1">{userId}</p></div></nav>); };
-const Dashboard = ({ invoices, expenses, customers, products }) => { const { totalIncome, totalExpense } = useMemo(() => ({ totalIncome: (invoices || []).reduce((s, i) => s + i.grandTotal, 0), totalExpense: (expenses || []).reduce((s, e) => s + e.amount, 0), }), [invoices, expenses]); const chartData = [ { name: 'Gelir', Tutar: totalIncome }, { name: 'Gider', Tutar: totalExpense } ]; return (<div><h1 className="text-3xl font-bold text-gray-800 mb-8">Gösterge Paneli</h1><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"><StatCard title="Toplam Gelir" value={formatCurrency(totalIncome)} color="text-green-600" icon={TrendingUp} /><StatCard title="Toplam Gider" value={formatCurrency(totalExpense)} color="text-red-600" icon={TrendingDown}/><StatCard title="Toplam Cari" value={(customers || []).length} color="text-blue-600" icon={Users}/><StatCard title="Ürün/Hizmet" value={(products || []).length} color="text-purple-600" icon={Package}/></div><div className="mt-8 bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h3 className="text-lg font-semibold text-gray-700 mb-4">Gelir & Gider Analizi</h3><ResponsiveContainer width="100%" height={300}><BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis tickFormatter={(v) => `${(v/1000).toFixed(0)}k`}/><Tooltip contentStyle={{ backgroundColor: 'white', borderRadius: '0.5rem', borderColor: '#e5e7eb' }} formatter={(v) => formatCurrency(v)} /><Legend /><Bar dataKey="Tutar" fill="#0ea5e9" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></div>); };
-const StatCard = ({ title, value, color, icon: Icon }) => (<div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between"><div className="flex flex-col"><h4 className="text-sm font-medium text-gray-500">{title}</h4><p className={`text-3xl font-bold mt-2 ${color}`}>{value}</p></div><div className={`p-3 rounded-full bg-opacity-10 ${color.replace('text', 'bg').replace('-600', '-100')}`}><Icon className={`h-8 w-8 ${color}`}/></div></div>);
-const Invoices = ({ invoices, userId, customers, products, companyProfile, scriptsLoaded }) => { const [modalOpen, setModalOpen] = useState(false); const [editingInvoice, setEditingInvoice] = useState(null); const [viewingInvoice, setViewingInvoice] = useState(null); const [invoiceForPdf, setInvoiceForPdf] = useState(null); const [activeActionMenu, setActiveActionMenu] = useState(null); const menuRef = useRef(null); const printRef = useRef(null); const handleEdit = (invoice) => { setEditingInvoice(invoice); setModalOpen(true); setActiveActionMenu(null); }; const handleAddNew = () => { setEditingInvoice(null); setModalOpen(true); }; const handleShare = (invoice) => { if (!scriptsLoaded) { alert("Paylaşım için gerekli kütüphaneler yükleniyor, lütfen birkaç saniye sonra tekrar deneyin."); return; } setInvoiceForPdf(invoice); setActiveActionMenu(null); }; useEffect(() => { if (invoiceForPdf && printRef.current) { const generateAndShare = async () => { try { const { jsPDF } = window.jspdf; const canvas = await window.html2canvas(printRef.current, { scale: 2 }); const imgData = canvas.toDataURL('image/png'); const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' }); const pdfWidth = pdf.internal.pageSize.getWidth(); const pdfHeight = pdf.internal.pageSize.getHeight(); const imgWidth = canvas.width; const imgHeight = canvas.height; const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight); const imgX = (pdfWidth - imgWidth * ratio) / 2; pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio); const pdfBlob = pdf.output('blob'); const file = new File([pdfBlob], `fatura-${invoiceForPdf.invoiceNumber}.pdf`, { type: 'application/pdf' }); if (navigator.share && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: `Fatura: ${invoiceForPdf.invoiceNumber}`, text: `SAGG Muhasebe Faturası` }); } else { const link = document.createElement('a'); link.href = URL.createObjectURL(file); link.download = `fatura-${invoiceForPdf.invoiceNumber}.pdf`; link.click(); URL.revokeObjectURL(link.href); alert("Tarayıcınız paylaşımı desteklemiyor. Fatura PDF olarak indirildi."); } } catch (err) { alert('Fatura PDF olarak oluşturulurken bir hata oluştu.'); console.error(err); } finally { setInvoiceForPdf(null); } }; generateAndShare(); } }, [invoiceForPdf]); useEffect(() => { const handleClickOutside = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setActiveActionMenu(null); }; document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside); }, []); return (<div><div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-800">Faturalar</h1><button onClick={handleAddNew} className="flex items-center bg-sky-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-sky-700 transition-colors focus:ring-4 focus:ring-sky-300"><PlusCircle className="h-5 w-5 mr-2"/>Yeni Fatura Oluştur</button></div><div className="bg-white rounded-xl shadow-sm border border-gray-200"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200"><thead><tr className="bg-gray-50"><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fatura No</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Müşteri</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tutar</th><th className="relative px-6 py-3"><span className="sr-only">İşlemler</span></th></tr></thead><tbody className="bg-white divide-y divide-gray-200">{(invoices || []).map(inv => (<tr key={inv.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingInvoice(inv)}><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{inv.invoiceNumber}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{inv.customerSnapshot?.name}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(inv.date)}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">{formatCurrency(inv.grandTotal)}</td><td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative"><button onClick={(e) => { e.stopPropagation(); setActiveActionMenu(inv.id === activeActionMenu ? null : inv.id);}} className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><MoreVertical size={20}/></button>{activeActionMenu === inv.id && (<div ref={menuRef} className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 text-left"><div className="py-1"><a href="#" onClick={(e) => {e.stopPropagation(); handleEdit(inv)}} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Edit size={16} className="mr-3"/>Düzenle</a><a href="#" onClick={(e) => {e.stopPropagation(); handleShare(inv)}} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><Send size={16} className="mr-3"/>Gönder/Paylaş</a></div></div>)}</td></tr>))}</tbody></table></div></div>{(modalOpen || editingInvoice) && <InvoiceModal setShowModal={setModalOpen} userId={userId} customers={customers} products={products} editingInvoice={editingInvoice} setEditingInvoice={setEditingInvoice}/>}{viewingInvoice && <InvoicePrintView invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} companyProfile={companyProfile}/>}{invoiceForPdf && <div className="fixed left-[-9999px] top-0"><InvoicePrintView ref={printRef} invoice={invoiceForPdf} companyProfile={companyProfile} /></div>}</div>); };
-const InvoiceModal = ({ setShowModal, userId, customers, products, editingInvoice, setEditingInvoice }) => { const [form, setForm] = useState({ customerId: '', invoiceNumber: '', date: new Date().toISOString().split('T')[0], items: [{ productId: '', description: '', quantity: 1, unitPrice: 0 }], kdvRate: 20 }); useEffect(() => { if (editingInvoice) { const date = editingInvoice.date?.toDate ? editingInvoice.date.toDate() : new Date(); setForm({ ...editingInvoice, date: date.toISOString().split('T')[0] }); } }, [editingInvoice]); const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value }); const handleItemChange = (index, field, value) => { const newItems = [...form.items]; newItems[index][field] = value; if (field === 'productId' && value) { const product = products.find(p => p.id === value); if (product) { newItems[index].description = product.name; newItems[index].unitPrice = product.price; } } setForm({...form, items: newItems}); }; const addItem = () => setForm({...form, items: [...form.items, { productId: '', description: '', quantity: 1, unitPrice: 0 }]}); const removeItem = (index) => setForm({...form, items: form.items.filter((_, i) => i !== index)}); const subTotal = useMemo(() => form.items.reduce((s, i) => s + (i.quantity * i.unitPrice || 0), 0), [form.items]); const kdvAmount = useMemo(() => subTotal * (form.kdvRate / 100), [subTotal, form.kdvRate]); const grandTotal = useMemo(() => subTotal + kdvAmount, [subTotal, kdvAmount]); const handleSubmit = async (e) => { e.preventDefault(); const selectedCustomer = customers.find(c => c.id === form.customerId); if (!selectedCustomer || !form.invoiceNumber) { alert("Lütfen müşteri ve fatura numarası girin."); return; } const dataToSave = { ...form, date: Timestamp.fromDate(new Date(form.date)), customerSnapshot: selectedCustomer, subTotal, kdvAmount, grandTotal }; try { if (editingInvoice) { const docRef = doc(db, `artifacts/${appId}/users/${userId}/invoices`, editingInvoice.id); await updateDoc(docRef, dataToSave); } else { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/invoices`), dataToSave); } setShowModal(false); setEditingInvoice(null); } catch (error) { console.error("Fatura kaydedilirken hata:", error); } }; return (<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"><form onSubmit={handleSubmit}><div className="p-6 border-b flex justify-between items-center"><h3 className="text-xl font-semibold text-gray-800">{editingInvoice?'Fatura Düzenle':'Yeni Fatura'}</h3><button type="button" onClick={()=>{setShowModal(false); setEditingInvoice(null)}} className="text-gray-400 hover:text-gray-600"><X/></button></div><div className="p-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><select name="customerId" value={form.customerId} onChange={handleChange} className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required><option value="" disabled>Müşteri Seçin</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><input type="text" name="invoiceNumber" placeholder="Fatura Numarası" value={form.invoiceNumber} onChange={handleChange} className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required /><input type="date" name="date" value={form.date} onChange={handleChange} className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required /><select name="kdvRate" value={form.kdvRate} onChange={handleChange} className="p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500"><option value="1">KDV %1</option><option value="10">KDV %10</option><option value="20">KDV %20</option></select></div><div className="border-t pt-4"><h4 className="font-semibold text-gray-600 mb-2">Fatura Kalemleri</h4>{form.items.map((item, index) => (<div key={index} className="grid grid-cols-12 gap-2 mb-2 items-center"><select value={item.productId} onChange={e => handleItemChange(index, 'productId', e.target.value)} className="col-span-12 md:col-span-4 p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500"><option value="">Ürün/Hizmet Seç</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><input type="number" placeholder="Miktar" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', Number(e.target.value))} className="col-span-4 md:col-span-2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required /><input type="number" step="0.01" placeholder="Birim Fiyat" value={item.unitPrice} onChange={e => handleItemChange(index, 'unitPrice', Number(e.target.value))} className="col-span-5 md:col-span-3 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required /><span className="col-span-2 p-2 text-right text-sm text-gray-700">{formatCurrency(item.quantity * item.unitPrice)}</span><button type="button" onClick={() => removeItem(index)} className="col-span-1 text-red-500 hover:text-red-700 flex justify-center items-center"><X size={18}/></button></div>))}<button type="button" onClick={addItem} className="text-sm font-medium text-sky-600 hover:text-sky-800 mt-2">+ Kalem Ekle</button></div><div className="mt-6 border-t pt-4 flex justify-end"><div className="w-full max-w-xs space-y-2"><div className="flex justify-between text-gray-600"><p>Ara Toplam:</p><p className="font-medium">{formatCurrency(subTotal)}</p></div><div className="flex justify-between text-gray-600"><p>KDV (%{form.kdvRate}):</p><p className="font-medium">{formatCurrency(kdvAmount)}</p></div><div className="flex justify-between font-bold text-xl text-gray-800 mt-2 border-t pt-2"><p>Genel Toplam:</p><p>{formatCurrency(grandTotal)}</p></div></div></div></div><div className="p-4 bg-gray-50 border-t flex justify-end space-x-3"><button type="button" onClick={()=>{setShowModal(false);setEditingInvoice(null)}} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">İptal</button><button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-lg shadow-sm hover:bg-sky-700">Kaydet</button></div></form></div></div>);};
-const InvoicePrintView = forwardRef(({ invoice, onClose, companyProfile }, ref) => { const printStyles = `@media print{body *{visibility:hidden}#invoice-print-area,#invoice-print-area *{visibility:visible}#invoice-print-area{position:absolute;left:0;top:0;width:100%}.no-print{display:none}}`; const handlePrint = () => window.print(); const { customerSnapshot } = invoice; return (<div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-start z-50 p-4 overflow-y-auto no-print"><style>{printStyles}</style><div className="bg-white w-full max-w-4xl shadow-2xl my-8 rounded-lg"><div id="invoice-print-area" ref={ref} className="p-10 bg-white"><header className="flex justify-between items-start pb-6 border-b"><div><h1 className="text-3xl font-bold text-gray-800">{companyProfile?.companyName || "Şirket Adınız"}</h1><p className="text-gray-500 mt-2 max-w-xs">{companyProfile?.address || "Şirket Adresiniz"}</p></div><div className="text-right"><h2 className="text-4xl font-bold uppercase text-gray-400">Fatura</h2><p className="text-gray-500 mt-2">No: {invoice.invoiceNumber}</p></div></header><section className="flex justify-between mt-8"><div><h3 className="font-semibold text-gray-500 uppercase text-sm tracking-wider">Fatura Sahibi</h3><p className="font-bold text-gray-800 mt-1">{customerSnapshot?.name}</p><p className="text-gray-600 max-w-xs mt-1">{customerSnapshot?.address}</p>{customerSnapshot?.accountType === 'Tüzel Kişi' && (<><p className="text-gray-600 text-sm mt-1">Vergi Dairesi: {customerSnapshot?.taxOffice}</p><p className="text-gray-600 text-sm">VKN: {customerSnapshot?.taxId}</p></>)}{customerSnapshot?.accountType === 'Şahıs' && (<p className="text-gray-600 text-sm mt-1">TCKN: {customerSnapshot?.tcNo}</p>)}</div><div className="text-right"><h3 className="font-semibold text-gray-500 text-sm tracking-wider">Fatura Tarihi:</h3><p className="text-gray-700 mt-1">{formatDate(invoice.date)}</p></div></section><section className="mt-8"><table className="w-full text-left"><thead><tr className="bg-gray-50">
-<th className="p-3 font-semibold uppercase text-xs text-gray-500">Açıklama</th><th className="p-3 font-semibold uppercase text-xs text-gray-500 text-right">Miktar</th><th className="p-3 font-semibold uppercase text-xs text-gray-500 text-right">Birim Fiyat</th><th className="p-3 font-semibold uppercase text-xs text-gray-500 text-right">Toplam</th></tr></thead><tbody>{invoice.items.map((item, i) => (<tr key={i} className="border-b"><td className="p-3 text-sm text-gray-800">{item.description}</td><td className="p-3 text-sm text-gray-600 text-right">{item.quantity}</td><td className="p-3 text-sm text-gray-600 text-right">{formatCurrency(item.unitPrice)}</td><td className="p-3 text-sm text-gray-800 font-medium text-right">{formatCurrency(item.quantity * item.unitPrice)}</td></tr>))}</tbody></table></section><section className="flex justify-end mt-8"><div className="w-full max-w-sm space-y-2"><div className="flex justify-between text-gray-600"><p>Ara Toplam:</p><p>{formatCurrency(invoice.subTotal)}</p></div><div className="flex justify-between text-gray-600"><p>KDV (%{invoice.kdvRate}):</p><p>{formatCurrency(invoice.kdvAmount)}</p></div><div className="flex justify-between font-bold text-xl text-gray-800 mt-4 border-t pt-2"><p>Genel Toplam:</p><p>{formatCurrency(invoice.grandTotal)}</p></div></div></section><section className="mt-8 border-t pt-4"><p className="text-xs text-gray-500">Yalnız: <span className="font-medium text-gray-600">{numberToWordsTr(invoice.grandTotal)}</span></p></section><footer className="mt-10 border-t pt-4"><h3 className="font-semibold text-gray-500 uppercase text-xs tracking-wider mb-2">Ödeme Bilgileri</h3>{(companyProfile?.bankAccounts || []).map((acc,i)=>(<div key={i} className="text-sm text-gray-600"><p><span className="font-semibold text-gray-800">{acc.bankName}:</span> {acc.iban}</p></div>))}</footer></div><div className="p-4 bg-gray-50 flex justify-end space-x-2 no-print rounded-b-lg"><button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Kapat</button><button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-600 text-white rounded-lg shadow-sm hover:bg-sky-700"><Printer size={16} className="mr-2"/> Yazdır</button></div></div></div>); });
-InvoicePrintView.displayName = 'InvoicePrintView';
-const FormModal = ({ title, children, onSubmit, setShowModal }) => ( <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-lg"><form onSubmit={onSubmit}><div className="p-6 border-b"><div className="flex justify-between items-center"><h3 className="text-xl font-semibold text-gray-800">{title}</h3><button type="button" onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X /></button></div></div><div className="p-6">{children}</div><div className="p-4 bg-gray-50 border-t flex justify-end space-x-3"><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">İptal</button><button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-lg shadow-sm hover:bg-sky-700">Kaydet</button></div></form></div></div>);
-const Customers = ({ customers, userId }) => { const [showModal, setShowModal] = useState(false); return (<div><div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-800">Cari Hesaplar</h1><button onClick={() => setShowModal(true)} className="flex items-center bg-sky-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-sky-700 transition-colors focus:ring-4 focus:ring-sky-300"><PlusCircle className="h-5 w-5 mr-2" />Yeni Cari Ekle</button></div><div className="bg-white rounded-xl shadow-sm border border-gray-200"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200"><thead><tr className="bg-gray-50"><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adı</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipi</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vergi/TCKN No</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th></tr></thead><tbody className="bg-white divide-y divide-gray-200">{(customers || []).map(c => (<tr key={c.id} className="hover:bg-gray-50"><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{c.name}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.accountType}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.taxId || c.tcNo}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.email}</td></tr>))}</tbody></table></div></div>{showModal && <CustomerModal setShowModal={setShowModal} userId={userId} />}</div>); };
-const CustomerModal = ({ setShowModal, userId }) => { const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', accountType: 'Tüzel Kişi', taxOffice: '', taxId: '', tcNo: '' }); const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value }); const handleSubmit = async (e) => { e.preventDefault(); if(!form.name) return; try { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/customers`), form); setShowModal(false); } catch (error) { console.error("Error creating customer:", error); } }; return (<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-2xl"><form onSubmit={handleSubmit}><div className="p-6 border-b"><div className="flex justify-between items-center"><h3 className="text-xl font-semibold text-gray-800">Yeni Cari Hesap Ekle</h3><button type="button" onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X /></button></div></div><div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4"><input type="text" name="name" placeholder="Adı Soyadı / Firma Adı" value={form.name} onChange={handleChange} className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 md:col-span-2" required /><select name="accountType" value={form.accountType} onChange={handleChange} className="p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500"><option value="Tüzel Kişi">Tüzel Kişi</option><option value="Şahıs">Şahıs</option></select><div></div>{form.accountType === 'Tüzel Kişi' ? (<><input type="text" name="taxOffice" placeholder="Vergi Dairesi" value={form.taxOffice} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" /><input type="text" name="taxId" placeholder="Vergi Kimlik No (VKN)" value={form.taxId} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" /></>) : (<><input type="text" name="tcNo" placeholder="T.C. Kimlik No" value={form.tcNo} onChange={handleChange} className="p-2 border border-gray-300 rounded-md md:col-span-2" /></>)}<input type="email" name="email" placeholder="E-posta" value={form.email} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" /><input type="tel" name="phone" placeholder="Telefon" value={form.phone} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" /><textarea name="address" placeholder="Adres" value={form.address} onChange={handleChange} className="p-2 border border-gray-300 rounded-md md:col-span-2 h-24" required></textarea></div><div className="p-4 bg-gray-50 border-t flex justify-end space-x-3"><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">İptal</button><button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-lg shadow-sm hover:bg-sky-700">Kaydet</button></div></form></div></div>); };
-const Expenses = ({ expenses, userId, accounts }) => { const [showModal, setShowModal] = useState(false); return (<div><div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-800">Giderler</h1><button onClick={() => setShowModal(true)} className="flex items-center bg-sky-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-sky-700 transition-colors focus:ring-4 focus:ring-sky-300"><PlusCircle className="h-5 w-5 mr-2" />Yeni Gider Ekle</button></div><div className="bg-white rounded-xl shadow-sm border border-gray-200"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200"><thead><tr className="bg-gray-50"><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Açıklama</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ödenen Hesap</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tutar</th></tr></thead><tbody className="bg-white divide-y divide-gray-200">{(expenses || []).map(exp => (<tr key={exp.id} className="hover:bg-gray-50"><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(exp.date)}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{exp.category}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{exp.description}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{exp.accountName || '-'}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">{formatCurrency(exp.amount)}</td></tr>))}</tbody></table></div></div>{showModal && <ExpenseModal setShowModal={setShowModal} userId={userId} accounts={accounts} />}</div>); };
-const ExpenseModal = ({ setShowModal, userId, accounts }) => { const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], category: 'Ofis Malzemeleri', description: '', amount: '', kdvRate: 20, accountId: '' }); const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value }); const handleSubmit = async (e) => { e.preventDefault(); if (!form.description || form.amount <= 0) return; const selectedAccount = accounts.find(a => a.id === form.accountId); const dataToSave = { ...form, amount: Number(form.amount), date: Timestamp.fromDate(new Date(form.date)), accountName: selectedAccount?.name || null }; try { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/expenses`), dataToSave); setShowModal(false); } catch (error) { console.error("Error creating expense:", error); } }; return (<FormModal title="Yeni Gider Ekle" onSubmit={handleSubmit} setShowModal={setShowModal}><div className="grid grid-cols-1 gap-4"><input name="date" type="date" value={form.date} onChange={handleChange} className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required /><select name="category" value={form.category} onChange={handleChange} className="p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500"><option>Ofis Malzemeleri</option><option>Personel</option><option>Kira</option><option>Pazarlama</option><option>Diğer</option></select><select name="kdvRate" value={form.kdvRate} onChange={handleChange} className="p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500"><option value="1">KDV %1 Dahil</option><option value="10">KDV %10 Dahil</option><option value="20">KDV %20 Dahil</option></select><select name="accountId" value={form.accountId} onChange={handleChange} className="p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500"><option value="">Hesap Seç (Opsiyonel)</option>{(accounts || []).map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select><input name="description" type="text" placeholder="Açıklama" value={form.description} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" required /><input name="amount" type="number" step="0.01" placeholder="Toplam Tutar (KDV Dahil)" value={form.amount} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" required /></div></FormModal>); };
-const Products = ({ products, userId }) => { const [showModal, setShowModal] = useState(false); return (<div><div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-800">Ürün ve Hizmetler</h1><button onClick={() => setShowModal(true)} className="flex items-center bg-sky-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-sky-700 transition-colors focus:ring-4 focus:ring-sky-300"><PlusCircle className="h-5 w-5 mr-2" />Yeni Ekle</button></div><div className="bg-white rounded-xl shadow-sm border border-gray-200"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200"><thead><tr className="bg-gray-50"><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stok Kodu</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adı</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Satış Fiyatı</th></tr></thead><tbody className="bg-white divide-y divide-gray-200">{(products || []).map(p => (<tr key={p.id} className="hover:bg-gray-50"><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{p.code}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{p.name}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">{formatCurrency(p.price)}</td></tr>))}</tbody></table></div></div>{showModal && <ProductModal setShowModal={setShowModal} userId={userId} />}</div>); };
-const ProductModal = ({ setShowModal, userId }) => { const [form, setForm] = useState({ name: '', price: '', code: '' }); const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value }); const handleSubmit = async (e) => { e.preventDefault(); if(!form.name || form.price <= 0) return; try { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/products`), { ...form, price: Number(form.price) }); setShowModal(false); } catch (error) { console.error("Error creating product:", error); } }; return (<FormModal title="Yeni Ürün/Hizmet Ekle" onSubmit={handleSubmit} setShowModal={setShowModal}><div className="grid grid-cols-1 gap-4"><input name="name" type="text" placeholder="Ürün/Hizmet Adı" value={form.name} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" required /><input name="code" type="text" placeholder="Stok Kodu (Opsiyonel)" value={form.code} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" /><input name="price" type="number" step="0.01" placeholder="Birim Satış Fiyatı (KDV Hariç)" value={form.price} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" required /></div></FormModal>); };
-const BankAccounts = ({ accounts, userId }) => { const [showModal, setShowModal] = useState(false); return (<div><div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-800">Kasa ve Banka Hesapları</h1><button onClick={() => setShowModal(true)} className="flex items-center bg-sky-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-sky-700 transition-colors focus:ring-4 focus:ring-sky-300"><PlusCircle className="h-5 w-5 mr-2" />Yeni Ekle</button></div><div className="bg-white rounded-xl shadow-sm border border-gray-200"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200"><thead><tr className="bg-gray-50"><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hesap Adı</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Türü</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IBAN</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bakiye</th></tr></thead><tbody className="bg-white divide-y divide-gray-200">{(accounts || []).map(a => (<tr key={a.id} className="hover:bg-gray-50"><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{a.name}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{a.type}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{a.iban}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">{formatCurrency(a.balance)}</td></tr>))}</tbody></table></div></div>{showModal && <BankAccountModal setShowModal={setShowModal} userId={userId} />}</div>); };
-const BankAccountModal = ({ setShowModal, userId }) => { const [form, setForm] = useState({ name: '', type: 'Banka', iban: '', balance: 0 }); const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value }); const handleSubmit = async (e) => { e.preventDefault(); if(!form.name) return; try { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/accounts`), form); setShowModal(false); } catch (error) { console.error("Error creating account:", error); } }; return (<FormModal title="Yeni Kasa/Banka Hesabı Ekle" onSubmit={handleSubmit} setShowModal={setShowModal}><div className="grid grid-cols-1 gap-4"><input name="name" type="text" placeholder="Hesap Adı (örn: İş Bankası Maaş)" value={form.name} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" required /><select name="type" value={form.type} onChange={handleChange} className="p-2 border border-gray-300 rounded-md bg-white"><option>Banka</option><option>Nakit Kasa</option></select><input name="iban" type="text" placeholder="IBAN (Banka ise)" value={form.iban} onChange={handleChange} className="p-2 border border-gray-300 rounded-md" /></div></FormModal>); };
-const Reports = ({ invoices, expenses }) => { const { kdvFromSales, kdvFromExpenses, kdvPayable } = useMemo(() => { const kdvFromSales = (invoices || []).reduce((s, i) => s + (i.kdvAmount || 0), 0); const kdvFromExpenses = (expenses || []).reduce((s, e) => s + (e.amount * e.kdvRate / (100 + e.kdvRate) || 0), 0); return { kdvFromSales, kdvFromExpenses, kdvPayable: kdvFromSales - kdvFromExpenses }; }, [invoices, expenses]); return (<div><h1 className="text-3xl font-bold text-gray-800 mb-6">Raporlar</h1><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h2 className="text-xl font-semibold text-gray-700 mb-4">KDV Raporu</h2><div className="space-y-4"><div className="flex justify-between items-center p-4 bg-green-50 rounded-lg"><span className="font-semibold text-green-800">Hesaplanan KDV (Faturalardan)</span><span className="font-bold text-lg text-green-600">{formatCurrency(kdvFromSales)}</span></div><div className="flex justify-between items-center p-4 bg-red-50 rounded-lg"><span className="font-semibold text-red-800">İndirilecek KDV (Giderlerden)</span><span className="font-bold text-lg text-red-600">{formatCurrency(kdvFromExpenses)}</span></div><div className="flex justify-between items-center p-4 bg-sky-50 rounded-lg mt-4 border-t-2 border-sky-200"><span className="font-semibold text-xl text-sky-800">Ödenecek KDV</span><span className="font-bold text-2xl text-sky-600">{formatCurrency(kdvPayable)}</span></div><p className="text-xs text-gray-500 mt-4">* Bu rapor yalnızca bilgilendirme amaçlıdır. Lütfen nihai beyanlarınız için mali müşavirinize danışın.</p></div></div></div>); };
-const SettingsPage = ({ userId, companyProfile }) => { const [profile, setProfile] = useState({ companyName: '', address: '', bankAccounts: [{ bankName: '', iban: '' }] }); useEffect(() => { if (companyProfile) setProfile(prev => ({ ...prev, ...companyProfile })); }, [companyProfile]); const handleChange = (e) => setProfile({ ...profile, [e.target.name]: e.target.value }); const handleBankChange = (index, e) => { const newBankAccounts = [...(profile.bankAccounts || [])]; newBankAccounts[index][e.target.name] = e.target.value; setProfile({ ...profile, bankAccounts: newBankAccounts }); }; const addBankAccount = () => setProfile({ ...profile, bankAccounts: [...(profile.bankAccounts || []), { bankName: '', iban: '' }] }); const removeBankAccount = (index) => setProfile({ ...profile, bankAccounts: (profile.bankAccounts || []).filter((_, i) => i !== index) }); const handleSave = async () => { const docRef = doc(db, `artifacts/${appId}/users/${userId}/companyProfile`, 'main'); try { await setDoc(docRef, profile, { merge: true }); alert("Bilgiler kaydedildi!"); } catch (error) { console.error("Profil kaydedilirken hata oluştu: ", error); } }; return (<div><h1 className="text-3xl font-bold text-gray-800 mb-6">Ayarlar</h1><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h3 className="text-lg font-semibold text-gray-700">Şirket Bilgileri</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"><input type="text" name="companyName" value={profile.companyName || ''} onChange={handleChange} placeholder="Şirketinizin Resmi Adı" className="p-2 border border-gray-300 rounded-md"/><textarea name="address" value={profile.address || ''} onChange={handleChange} placeholder="Şirket Adresi" className="p-2 border border-gray-300 rounded-md md:col-span-2 h-20"/></div><h3 className="text-lg font-semibold text-gray-700 mt-6 border-t pt-6">Banka Bilgileri</h3>{(profile.bankAccounts || []).map((acc, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 mt-4 items-center"><input type="text" name="bankName" value={acc.bankName} onChange={(e) => handleBankChange(index, e)} placeholder="Banka Adı" className="p-2 border border-gray-300 rounded-md md:col-span-2"/><input type="text" name="iban" value={acc.iban} onChange={(e) => handleBankChange(index, e)} placeholder="IBAN" className="p-2 border border-gray-300 rounded-md md:col-span-3"/><button onClick={() => removeBankAccount(index)} className="text-red-500 hover:text-red-700"><X size={20}/></button></div>))}<button onClick={addBankAccount} className="text-sm font-medium text-sky-600 hover:text-sky-800 mt-2">+ Yeni Banka Hesabı Ekle</button><div className="mt-8 border-t pt-6 flex justify-end"><button onClick={handleSave} className="px-6 py-2 bg-sky-600 text-white rounded-lg shadow-sm hover:bg-sky-700">Kaydet</button></div></div></div>); };
-const SimpleModal = ({ title, children, onClose }) => (<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-lg"><div className="p-6 border-b"><div className="flex justify-between items-center"><h3 className="text-xl font-semibold text-gray-800">{title}</h3><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X/></button></div></div><div className="p-6">{children}</div><div className="p-4 bg-gray-50 border-t flex justify-end"><button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Kapat</button></div></div></div>);
