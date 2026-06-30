@@ -3,9 +3,13 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Menu, Search, Calendar, Bell, Mail, Settings as SettingsIcon, LogIn, LogOut,
   Sun, Moon, Users, Package, Receipt, AlertTriangle, ScrollText, CalendarClock,
+  User, UserRound, Smile, Cat, Crown,
 } from 'lucide-react';
 import { allProductStocks } from '../finance';
 import { toDate, formatDateShort, daysBetween } from '../utils';
+
+// Profil ikonu seçenekleri (kullanıcı 5 seçenekten birini seçebilir)
+export const AVATARS = { user: User, round: UserRound, smile: Smile, cat: Cat, crown: Crown };
 
 const Pop = ({ children, onClose, width = 'w-80' }) => (
   <>
@@ -18,7 +22,7 @@ const Pop = ({ children, onClose, width = 'w-80' }) => (
 
 const iconBtn = 'relative flex items-center justify-center w-10 h-10 rounded-full glass text-gray-600 dark:text-gray-200 hover:opacity-90';
 
-export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnonymous, onAuth, onLogout, dark, toggleDark, logo }) {
+export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnonymous, onAuth, onLogout, dark, toggleDark, logo, avatar = 'user', setAvatar }) {
   const { customers = [], products = [], invoices = [], reminders = [], checks = [] } = data;
   const [open, setOpen] = useState(null); // 'cal' | 'bell' | 'profile' | null
   const [q, setQ] = useState('');
@@ -66,13 +70,17 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnony
   }, [reminders, checks]);
 
   const go = (page) => { setPage(page); setOpen(null); setQ(''); };
-  const initials = isAnonymous ? 'M' : (userEmail || 'K').slice(0, 2).toUpperCase();
+  const AvatarIcon = AVATARS[avatar] || User;
 
   return (
     <header className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 h-16 px-3 sm:px-6 glass border-b border-white/30 dark:border-white/10 no-print">
       <button onClick={onOpenMobile} className="md:hidden flex items-center justify-center w-10 h-10 rounded-full glass text-gray-600 dark:text-gray-200"><Menu size={20} /></button>
 
-      {logo && <img src={logo} alt="Logo" className="h-8 max-w-[110px] object-contain md:hidden" />}
+      {logo && (
+        <button onClick={() => go('dashboard')} title="Gösterge Paneli" className="md:hidden flex items-center hover:opacity-80">
+          <img src={logo} alt="Logo" className="h-8 max-w-[110px] object-contain" />
+        </button>
+      )}
 
       {/* Arama */}
       <div className="relative flex-1 max-w-md" ref={searchRef}>
@@ -148,13 +156,30 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnony
 
       {/* Profil */}
       <div className="relative">
-        <button onClick={() => setOpen(open === 'profile' ? null : 'profile')} className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 text-white text-sm font-semibold flex items-center justify-center shadow-sm">{initials}</button>
+        <button onClick={() => setOpen(open === 'profile' ? null : 'profile')} className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 text-white flex items-center justify-center shadow-sm"><AvatarIcon size={19} /></button>
         {open === 'profile' && (
           <Pop onClose={() => setOpen(null)} width="w-64">
             <div className="px-3 py-2 border-b border-white/30 dark:border-white/10 mb-1">
               <p className="text-sm font-semibold truncate">{isAnonymous ? 'Misafir' : userEmail}</p>
               <p className="text-xs text-gray-400">{isAnonymous ? 'Yalnız bu cihaz' : 'Senkronize hesap'}</p>
             </div>
+            {setAvatar && (
+              <div className="px-3 py-2 border-b border-white/30 dark:border-white/10 mb-1">
+                <p className="text-xs text-gray-400 mb-1.5">Profil ikonu</p>
+                <div className="flex gap-1.5">
+                  {Object.entries(AVATARS).map(([key, Icon]) => (
+                    <button
+                      key={key}
+                      onClick={() => setAvatar(key)}
+                      title={key}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${avatar === key ? 'bg-orange-600 text-white' : 'bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/20'}`}
+                    >
+                      <Icon size={17} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button onClick={() => go('settings')} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm"><SettingsIcon size={16} />Ayarlar</button>
             <button onClick={() => { toggleDark(); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm">{dark ? <Sun size={16} /> : <Moon size={16} />}{dark ? 'Açık Mod' : 'Koyu Mod'}</button>
             {isAnonymous ? (

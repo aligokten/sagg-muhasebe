@@ -169,6 +169,11 @@ export default function App() {
   }, [dark]);
   const toggleDark = () => setDark((d) => !d);
 
+  const [avatar, setAvatar] = useState(() => {
+    try { return localStorage.getItem('sagg-avatar') || 'user'; } catch { return 'user'; }
+  });
+  const pickAvatar = (a) => { setAvatar(a); try { localStorage.setItem('sagg-avatar', a); } catch { /* yoksay */ } };
+
   const [data, setData] = useState({ ...EMPTY_DATA, companyProfile: { companyName: '', address: '', bankAccounts: [] } });
 
   // PDF kütüphanelerini yükle + kimlik doğrulama
@@ -300,6 +305,8 @@ export default function App() {
           dark={dark}
           toggleDark={toggleDark}
           logo={data.companyProfile?.logo}
+          avatar={avatar}
+          setAvatar={pickAvatar}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
       </div>
