@@ -1,5 +1,5 @@
 // --- Gösterge Paneli (modern "Sales Overview" tasarımı) ---
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import {
   MoreHorizontal, ArrowUpRight, ArrowDownRight, Download, SlidersHorizontal,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, monthKey, monthLabel, toDate, sum } from '../utils';
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
+import { downloadExcel, tl } from '../exportExcel';
 
 const initials = (name) =>
   (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase();
@@ -60,42 +61,6 @@ const startOfMonth = () => { const d = new Date(); return new Date(d.getFullYear
 export default function Dashboard({ data, setPage }) {
   const { invoices = [], expenses = [], incomes = [], customers = [], products = [], accounts = [], transactions = [] } = data;
   const [period, setPeriod] = useState('month');
-  const [exporting, setExporting] = useState(false);
-  const rootRef = useRef(null);
-
-  const handleExport = async () => {
-    if (!window.jspdf || !window.html2canvas) {
-      alert('Dışa aktarma kütüphaneleri henüz yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.');
-      return;
-    }
-    setExporting(true);
-    try {
-      const canvas = await window.html2canvas(rootRef.current, { scale: 2, backgroundColor: '#f3f4f6', useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgW = pageW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      let heightLeft = imgH;
-      let position = 0;
-      pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position = heightLeft - imgH;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-        heightLeft -= pageH;
-      }
-      pdf.save(`gosterge-paneli-${new Date().toLocaleDateString('tr-TR')}.pdf`);
-    } catch (e) {
-      console.error(e);
-      alert('Dışa aktarılırken bir hata oluştu.');
-    } finally {
-      setExporting(false);
-    }
-  };
 
   const cariBalances = useMemo(() => allCariBalances(data), [data]);
   const accBalances = useMemo(() => allAccountBalances(data), [data]);
@@ -172,8 +137,45 @@ export default function Dashboard({ data, setPage }) {
 
   const periodLabel = { today: 'Bugün', week: 'Bu Hafta', month: 'Bu Ay' }[period];
 
+  const handleExport = () => {
+    const today = new Date().toLocaleDateString('tr-TR');
+    const blocks = [
+      { heading: `SATIŞ ÖZETİ — ${today}` },
+      {
+        headers: ['Özet', 'Tutar'],
+        rows: [
+          ['Toplam Gelir', tl(totalIncome)],
+          ['Toplam Gider', tl(totalExpense)],
+          ['Net (Kâr/Zarar)', tl(totalIncome - totalExpense)],
+          ['Kasa/Banka Bakiye', tl(cashTotal)],
+          ['Toplam Alacak', tl(receivable)],
+          ['Tahsilat Oranı', `%${collectionRate.toFixed(0)}`],
+        ],
+      },
+      {
+        heading: 'Kasa / Banka Bakiyeleri',
+        headers: ['Hesap', 'Bakiye'],
+        rows: accounts.map((a) => [a.name, tl(accBalances[a.id] || 0)]),
+      },
+      {
+        heading: 'Cari Bakiyeleri',
+        headers: ['Cari', 'Bakiye', 'Durum'],
+        rows: customers.map((c) => {
+          const b = cariBalances[c.id] || 0;
+          return [c.name, tl(Math.abs(b)), Math.abs(b) < 0.01 ? '-' : b > 0 ? 'Borç (bize)' : 'Alacak (bizden)'];
+        }),
+      },
+      {
+        heading: 'Aylık Gelir (Son 7 Ay)',
+        headers: ['Ay', 'Gelir'],
+        rows: chart.map((c) => [c.ay, tl(c.tutar)]),
+      },
+    ];
+    downloadExcel(`satis-ozeti-${today.replace(/\./g, '-')}`, blocks);
+  };
+
   return (
-    <div ref={rootRef}>
+    <div>
       {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
@@ -181,7 +183,7 @@ export default function Dashboard({ data, setPage }) {
           <p className="text-sm text-gray-400 mt-1">Güncel finansal durumunuz ve hareketler</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"><Download size={15} />{exporting ? 'Hazırlanıyor...' : 'Dışa Aktar (PDF)'}</button>
+          <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"><Download size={15} />Excel'e Aktar</button>
           <button onClick={() => setPage('reports')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-gradient-to-r from-sky-500 to-cyan-500 hover:opacity-90 shadow-sm"><SlidersHorizontal size={15} />Raporlar</button>
         </div>
       </div>
