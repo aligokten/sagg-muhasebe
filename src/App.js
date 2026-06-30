@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
-  TrendingUp, Menu, X, AlertTriangle, DraftingCompass,
+  TrendingUp, Menu, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff,
 } from 'lucide-react';
 
 import {
-  auth, signInAnonymously, onAuthStateChanged,
+  auth, signInAnonymously, onAuthStateChanged, signOut,
   subscribeCollection, subscribeDoc, setRecord,
 } from './firebase';
 import { Spinner } from './components/ui';
+import AuthModal from './components/AuthModal';
 
 import Dashboard from './modules/Dashboard';
 import Customers from './modules/Customers';
@@ -34,6 +35,8 @@ const COLLECTIONS = [
   'transactions', 'accounts', 'expenses', 'incomes', 'checks',
   'personnel', 'stockMovements', 'reminders',
 ];
+
+const EMPTY_DATA = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
 
 const NAV_GROUPS = [
   {
@@ -79,7 +82,7 @@ const NAV_GROUPS = [
   },
 ];
 
-const Sidebar = ({ currentPage, setCurrentPage, userId, mobileOpen, setMobileOpen }) => (
+const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, onLogout, mobileOpen, setMobileOpen }) => (
   <>
     {mobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
     <nav className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-gray-800 text-white flex flex-col no-print transform transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -111,8 +114,27 @@ const Sidebar = ({ currentPage, setCurrentPage, userId, mobileOpen, setMobileOpe
         ))}
       </div>
       <div className="p-3 border-t border-gray-700">
-        <p className="text-xs text-gray-500">Kullanıcı ID</p>
-        <p className="text-xs text-gray-400 break-all mt-0.5">{userId}</p>
+        {isAnonymous ? (
+          <>
+            <div className="flex items-center gap-2 text-xs text-amber-300 mb-2">
+              <CloudOff size={14} /> Misafir (yalnız bu cihaz)
+            </div>
+            <button onClick={onAuth} className="flex items-center justify-center gap-2 w-full bg-sky-600 hover:bg-sky-700 text-white rounded-lg py-2 text-sm font-medium">
+              <LogIn size={15} /> Giriş / Kayıt Ol
+            </button>
+            <p className="text-[11px] text-gray-500 mt-2">Çok cihazdan erişim için hesap oluşturun.</p>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 text-xs text-emerald-300 mb-1">
+              <Cloud size={14} /> Senkronize
+            </div>
+            <p className="text-xs text-gray-300 break-all mb-2">{userEmail}</p>
+            <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg py-2 text-sm font-medium">
+              <LogOut size={15} /> Çıkış Yap
+            </button>
+          </>
+        )}
       </div>
     </nav>
   </>
@@ -120,14 +142,16 @@ const Sidebar = ({ currentPage, setCurrentPage, userId, mobileOpen, setMobileOpe
 
 export default function App() {
   const [userId, setUserId] = useState(null);
+  const [userEmail, setUserEmail] = useState(null);
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [authOpen, setAuthOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const emptyData = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
-  const [data, setData] = useState({ ...emptyData, companyProfile: { companyName: '', address: '', bankAccounts: [] } });
+  const [data, setData] = useState({ ...EMPTY_DATA, companyProfile: { companyName: '', address: '', bankAccounts: [] } });
 
   // PDF kütüphanelerini yükle + kimlik doğrulama
   useEffect(() => {
@@ -146,6 +170,8 @@ export default function App() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserId(user.uid);
+        setUserEmail(user.email);
+        setIsAnonymous(user.isAnonymous);
       } else {
         try {
           await signInAnonymously(auth);
@@ -162,10 +188,17 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  const handleLogout = async () => {
+    if (!window.confirm('Çıkış yapılsın mı? Bu cihaz tekrar misafir moduna döner; verilerinize yeniden giriş yaparak ulaşırsınız.')) return;
+    try { await signOut(auth); } catch (e) { console.error(e); }
+  };
+
   // Tüm koleksiyonları ve şirket profilini dinle
   useEffect(() => {
     if (!userId) return;
     setLoading(true);
+    // Kullanıcı değişince eski verileri temizle
+    setData({ ...EMPTY_DATA, companyProfile: { companyName: '', address: '', bankAccounts: [] } });
     const unsubs = COLLECTIONS.map((name) =>
       subscribeCollection(userId, name, (docs) => setData((prev) => ({ ...prev, [name]: docs })))
     );
@@ -225,15 +258,27 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
-      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} userId={userId} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <Sidebar
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        userEmail={userEmail}
+        isAnonymous={isAnonymous}
+        onAuth={() => setAuthOpen(true)}
+        onLogout={handleLogout}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="md:hidden flex items-center justify-between h-14 px-4 bg-white border-b no-print">
           <button onClick={() => setMobileOpen(true)} className="text-gray-600"><Menu /></button>
           <span className="font-bold text-gray-800">SAGG Defter</span>
-          <span className="w-6" />
+          {isAnonymous ? (
+            <button onClick={() => setAuthOpen(true)} className="text-sky-600"><LogIn size={20} /></button>
+          ) : <span className="w-6" />}
         </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
       </div>
+      {authOpen && <AuthModal isAnonymous={isAnonymous} onClose={() => setAuthOpen(false)} />}
     </div>
   );
 }

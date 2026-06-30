@@ -1,6 +1,10 @@
 // --- Firebase yapılandırması ve veri katmanı ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import {
+  getAuth, signInAnonymously, onAuthStateChanged,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  signOut, EmailAuthProvider, linkWithCredential,
+} from 'firebase/auth';
 import {
   getFirestore,
   collection,
@@ -30,7 +34,11 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const appId = 'sagg-muhasebe-app';
 
-export { signInAnonymously, onAuthStateChanged, Timestamp };
+export {
+  signInAnonymously, onAuthStateChanged, Timestamp,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  signOut, EmailAuthProvider, linkWithCredential,
+};
 
 // --- Yol yardımcıları ---
 const basePath = (userId) => `artifacts/${appId}/users/${userId}`;
