@@ -223,7 +223,7 @@ export default function Quotes({ data, userId }) {
     ...viewing,
     dueDate: viewing.validUntil,
     items: (viewing.lines || []).map((l) => ({
-      description: `${l.branch || ''}${l.description ? ' - ' + l.description : ''}${l.authorName ? ' (' + l.authorName + ')' : ''}`.trim(),
+      description: `${l.branch || ''}${l.description ? ' - ' + l.description : ''}`.trim() || 'Hizmet',
       quantity: 1, unit: '', unitPrice: l.amount, discount: 0, vatRate: 0,
     })),
     subTotal: viewing.grandTotal, discountTotal: 0, vatTotal: 0,

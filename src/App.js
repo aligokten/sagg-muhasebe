@@ -76,15 +76,19 @@ const NAV_GROUPS = [
   },
 ];
 
-const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, onLogout, mobileOpen, setMobileOpen }) => (
+const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, onLogout, logo, mobileOpen, setMobileOpen }) => (
   <>
     {mobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
     <nav className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-gray-800 text-white flex flex-col no-print transform transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700 flex-shrink-0">
-        <div className="flex items-center">
-          <span className="text-2xl font-bold text-sky-400">S</span>
-          <h1 className="text-lg font-bold ml-2 tracking-wide">SAGG Defter</h1>
-        </div>
+        {logo ? (
+          <img src={logo} alt="Logo" className="h-10 max-w-[170px] object-contain" />
+        ) : (
+          <div className="flex items-center">
+            <span className="text-2xl font-bold text-sky-400">S</span>
+            <h1 className="text-lg font-bold ml-2 tracking-wide">SAGG Defter</h1>
+          </div>
+        )}
         <button className="md:hidden text-gray-400" onClick={() => setMobileOpen(false)}><X size={20} /></button>
       </div>
       <div className="flex-1 overflow-y-auto py-4">
@@ -259,13 +263,18 @@ export default function App() {
         isAnonymous={isAnonymous}
         onAuth={() => setAuthOpen(true)}
         onLogout={handleLogout}
+        logo={data.companyProfile?.logo}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="md:hidden flex items-center justify-between h-14 px-4 bg-white border-b no-print">
           <button onClick={() => setMobileOpen(true)} className="text-gray-600"><Menu /></button>
-          <span className="font-bold text-gray-800">SAGG Defter</span>
+          {data.companyProfile?.logo ? (
+            <img src={data.companyProfile.logo} alt="Logo" className="h-8 max-w-[140px] object-contain" />
+          ) : (
+            <span className="font-bold text-gray-800">SAGG Defter</span>
+          )}
           {isAnonymous ? (
             <button onClick={() => setAuthOpen(true)} className="text-sky-600"><LogIn size={20} /></button>
           ) : <span className="w-6" />}

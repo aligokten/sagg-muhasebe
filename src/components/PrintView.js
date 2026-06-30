@@ -12,6 +12,7 @@ const DocBody = forwardRef(({ doc, companyProfile, heading }, ref) => {
     <div id="doc-print-area" ref={ref} className="p-10 bg-white">
       <header className="flex justify-between items-start pb-6 border-b">
         <div>
+          {companyProfile?.logo && <img src={companyProfile.logo} alt="Logo" className="max-h-20 max-w-[200px] object-contain mb-2" />}
           <h1 className="text-2xl font-bold text-gray-800">{companyProfile?.companyName || 'Şirket Adınız'}</h1>
           <p className="text-gray-500 mt-2 max-w-xs text-sm whitespace-pre-line">{companyProfile?.address || ''}</p>
           {companyProfile?.taxId && <p className="text-gray-500 text-sm mt-1">VKN: {companyProfile.taxId}</p>}
