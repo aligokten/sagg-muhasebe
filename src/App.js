@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
-  TrendingUp, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff,
+  TrendingUp, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff, ListChecks,
 } from 'lucide-react';
 
 import {
@@ -29,6 +29,7 @@ import Personnel from './modules/Personnel';
 import Reports from './modules/Reports';
 import Agenda from './modules/Agenda';
 import Settings from './modules/Settings';
+import AllTransactions from './modules/AllTransactions';
 import ArsaPaylastir from './ArsaPaylastir';
 
 const EMPTY_DATA = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
@@ -65,6 +66,7 @@ const NAV_GROUPS = [
       { id: 'accounts', label: 'Kasa & Banka', icon: Landmark },
       { id: 'checks', label: 'Çek & Senet', icon: ScrollText },
       { id: 'cashflow', label: 'Gelir & Gider', icon: TrendingUp },
+      { id: 'activity', label: 'Tüm İşlemler', icon: ListChecks },
     ],
   },
   {
@@ -264,6 +266,7 @@ export default function App() {
       case 'accounts': return <Accounts data={fullData} userId={userId} />;
       case 'checks': return <Checks data={fullData} userId={userId} />;
       case 'cashflow': return <CashFlow data={fullData} userId={userId} />;
+      case 'activity': return <AllTransactions data={fullData} userId={userId} />;
       case 'reports': return <Reports data={fullData} />;
       case 'agenda': return <Agenda data={fullData} userId={userId} />;
       case 'arsapay': return <ArsaPaylastir />;

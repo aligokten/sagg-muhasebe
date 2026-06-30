@@ -277,6 +277,7 @@ export default function Dashboard({ data, setPage }) {
                 <h3 className={`font-semibold ${heading}`}>İşlem Geçmişi</h3>
                 <p className={`text-xs ${muted}`}>Son hareketleriniz</p>
               </div>
+              <button onClick={() => setPage('activity')} className="text-xs font-medium text-orange-600 hover:text-orange-700">Tümü</button>
             </div>
             {recent.length === 0 ? (
               <p className={`text-center text-sm py-10 ${muted}`}>Henüz hareket yok</p>
