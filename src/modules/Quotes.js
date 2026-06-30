@@ -185,12 +185,12 @@ function QuoteForm({ existing, records, customers, authors, subcontracts = [], u
                   <button type="button" onClick={() => removeLine(idx)} className="hidden md:flex col-span-12 justify-end -mt-8 text-red-400 hover:text-red-600"><X size={16} /></button>
                 </div>
               ))}
-              <button type="button" onClick={addLine} className="text-sm font-medium text-sky-600 hover:text-sky-800 mt-2">+ Müellif Satırı Ekle</button>
+              <button type="button" onClick={addLine} className="text-sm font-medium text-orange-600 hover:text-orange-800 mt-2">+ Müellif Satırı Ekle</button>
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <Field label="Not / Açıklama">
-                <textarea name="note" value={form.note} onChange={setField} className="p-2 border border-gray-300 rounded-md h-20 outline-none focus:ring-2 focus:ring-sky-500" />
+                <textarea name="note" value={form.note} onChange={setField} className="p-2 border border-gray-300 rounded-md h-20 outline-none focus:ring-2 focus:ring-orange-500" />
               </Field>
               <div className="self-end flex justify-between font-bold text-xl text-gray-800 border-t pt-2">
                 <span>Toplam Teklif:</span><span>{formatCurrency(total)}</span>
@@ -236,7 +236,7 @@ export default function Quotes({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Teklif Sayısı" value={list.length} icon={FileText} color="text-sky-600" />
+        <StatCard title="Teklif Sayısı" value={list.length} icon={FileText} color="text-orange-600" />
         <StatCard title="Toplam Tutar" value={formatCurrency(sum(list, (q) => q.grandTotal))} color="text-gray-700" />
         <StatCard title="Kabul Edilen" value={formatCurrency(accepted)} color="text-green-600" />
       </div>
@@ -252,7 +252,7 @@ export default function Quotes({ data, userId }) {
                 <tr key={q.id} className="hover:bg-gray-50">
                   <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setViewing(q)}>{q.docNumber}</Td>
                   <Td className="text-gray-500">{q.customerSnapshot?.name}</Td>
-                  <Td className="text-gray-600"><span className="flex items-center gap-1"><Briefcase size={14} className="text-sky-500" />{q.projectName || '-'}</span></Td>
+                  <Td className="text-gray-600"><span className="flex items-center gap-1"><Briefcase size={14} className="text-orange-500" />{q.projectName || '-'}</span></Td>
                   <Td className="text-gray-500">{(q.lines || []).length} müellif</Td>
                   <Td><Badge color={st.color}>{st.label}</Badge></Td>
                   <Td align="right" className="font-semibold text-gray-800">{formatCurrency(q.grandTotal)}</Td>

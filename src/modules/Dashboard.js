@@ -1,18 +1,18 @@
-// --- Gösterge Paneli (modern "Sales Overview" tasarımı) ---
+// --- Gösterge Paneli (InvestIQ tarzı, turuncu tema) ---
 import React, { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import {
-  MoreHorizontal, ArrowUpRight, ArrowDownRight, Download, SlidersHorizontal,
-  Wallet, Users, FileText, AlertTriangle, Package, Moon, Sun,
+  ArrowUpRight, ArrowDownRight, Download, Filter,
+  Wallet, FileText, AlertTriangle, Moon, Sun, TrendingDown, TrendingUp,
 } from 'lucide-react';
-import { formatCurrency, monthKey, monthLabel, toDate, sum } from '../utils';
+import { formatCurrency, monthKey, monthLabel, toDate, formatDateShort, sum } from '../utils';
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
 import { downloadExcel } from '../exportExcel';
 
 const initials = (name) =>
   (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase();
 
-const AVATAR_COLORS = ['bg-sky-100 text-sky-700', 'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700'];
+const AVATAR_COLORS = ['bg-orange-100 text-orange-700', 'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700'];
 
 const ChangeBadge = ({ value, light }) => {
   if (value === null || value === undefined || !isFinite(value)) return null;
@@ -20,43 +20,52 @@ const ChangeBadge = ({ value, light }) => {
   const base = light ? 'bg-white/15 text-white' : up ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600';
   return (
     <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${base}`}>
-      {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}{Math.abs(value).toFixed(0)}%
+      {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}%{Math.abs(value).toFixed(1)}
     </span>
   );
 };
 
-// Yarım daire gösterge (gauge)
-const Gauge = ({ percent }) => {
-  const p = Math.max(0, Math.min(100, percent || 0));
-  const r = 80;
-  const arc = Math.PI * r; // yarım çember uzunluğu
-  const dash = (p / 100) * arc;
-  return (
-    <div className="relative w-full flex justify-center">
-      <svg viewBox="0 0 200 116" className="w-56 max-w-full">
-        <defs>
-          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="100%" stopColor="#4ade80" />
-          </linearGradient>
-        </defs>
-        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#eef2f6" strokeWidth="14" strokeLinecap="round" />
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="url(#gaugeGrad)"
-          strokeWidth="14"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${arc}`}
-        />
-      </svg>
-    </div>
-  );
-};
+// Küçük çizgi grafiği (sparkline)
+const Spark = ({ data, color, id }) => (
+  <ResponsiveContainer width="100%" height={48}>
+    <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+      <defs>
+        <linearGradient id={`spark-${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <Area type="monotone" dataKey="v" stroke={color} strokeWidth={2} fill={`url(#spark-${id})`} dot={false} />
+    </AreaChart>
+  </ResponsiveContainer>
+);
 
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const startOfWeek = () => { const d = startOfToday(); d.setDate(d.getDate() - 6); return d; };
 const startOfMonth = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); };
+
+const seriesFrom = (records, getDate, getAmt, months = 7) => {
+  const map = {};
+  records.forEach((r) => { const k = monthKey(getDate(r)); if (k) map[k] = (map[k] || 0) + (Number(getAmt(r)) || 0); });
+  const out = [];
+  const now = new Date();
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const k = monthKey(d);
+    out.push({ ay: monthLabel(k).split(' ')[0].slice(0, 3), v: map[k] || 0 });
+  }
+  return out;
+};
+
+const monthChange = (records, getDate, getAmt) => {
+  const now = new Date();
+  const thisKey = monthKey(now);
+  const lastKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  let cur = 0, prev = 0;
+  records.forEach((r) => { const k = monthKey(getDate(r)); if (k === thisKey) cur += Number(getAmt(r)) || 0; else if (k === lastKey) prev += Number(getAmt(r)) || 0; });
+  if (prev === 0) return cur > 0 ? 100 : null;
+  return ((cur - prev) / prev) * 100;
+};
 
 export default function Dashboard({ data, setPage }) {
   const { invoices = [], expenses = [], incomes = [], customers = [], products = [], accounts = [], transactions = [] } = data;
@@ -76,112 +85,64 @@ export default function Dashboard({ data, setPage }) {
 
   const salesInv = useMemo(() => invoices.filter((i) => (i.type || 'sales') === 'sales' && i.status !== 'cancelled'), [invoices]);
   const purchInv = useMemo(() => invoices.filter((i) => i.type === 'purchase' && i.status !== 'cancelled'), [invoices]);
+  const tahsilatlar = useMemo(() => transactions.filter((t) => t.type === 'tahsilat'), [transactions]);
 
   const totalIncome = sum(salesInv, (i) => i.grandTotal) + sum(incomes, (i) => i.amount);
   const totalExpense = sum(purchInv, (i) => i.grandTotal) + sum(expenses, (e) => e.amount);
+  const tahsilatTotal = sum(tahsilatlar, (t) => t.amount);
   const cashTotal = accounts.reduce((s, a) => s + (accBalances[a.id] || 0), 0);
   const receivable = customers.reduce((s, c) => s + Math.max(0, cariBalances[c.id] || 0), 0);
   const unpaidInvoices = salesInv.filter((i) => i.status !== 'paid').length;
   const lowStock = products.filter((p) => p.type !== 'service' && (stocks[p.id] || 0) <= (p.minStock || 0)).length;
 
-  // Aylık değişim (% vs geçen ay)
-  const monthChange = (records, getDate, getAmt) => {
-    const now = new Date();
-    const thisKey = monthKey(now);
-    const lastKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-    let cur = 0, prev = 0;
-    records.forEach((r) => {
-      const k = monthKey(getDate(r));
-      if (k === thisKey) cur += Number(getAmt(r)) || 0;
-      else if (k === lastKey) prev += Number(getAmt(r)) || 0;
-    });
-    if (prev === 0) return cur > 0 ? 100 : null;
-    return ((cur - prev) / prev) * 100;
-  };
   const incomeChange = monthChange([...salesInv, ...incomes], (r) => r.date, (r) => r.grandTotal ?? r.amount);
   const expenseChange = monthChange([...purchInv, ...expenses], (r) => r.date, (r) => r.grandTotal ?? r.amount);
+  const tahsilatChange = monthChange(tahsilatlar, (r) => r.date, (r) => r.amount);
 
-  // Dönemsel akış (bugün / hafta / ay)
+  // Dönemsel toplamlar (özet kartı)
   const periodStart = period === 'today' ? startOfToday() : period === 'week' ? startOfWeek() : startOfMonth();
   const inPeriod = (d) => { const x = toDate(d); return x && x >= periodStart; };
   const periodIncome = sum(salesInv.filter((i) => inPeriod(i.date)), (i) => i.grandTotal) + sum(incomes.filter((i) => inPeriod(i.date)), (i) => i.amount);
   const periodExpense = sum(purchInv.filter((i) => inPeriod(i.date)), (i) => i.grandTotal) + sum(expenses.filter((e) => inPeriod(e.date)), (e) => e.amount);
-  const flowRatio = periodIncome + periodExpense > 0 ? (periodIncome / (periodIncome + periodExpense)) * 100 : 0;
 
-  // Tahsilat oranı (ödenen satış / toplam satış)
-  const salesTotal = sum(salesInv, (i) => i.grandTotal);
-  const paidTotal = sum(salesInv.filter((i) => i.status === 'paid'), (i) => i.grandTotal);
-  const collectionRate = salesTotal > 0 ? (paidTotal / salesTotal) * 100 : 0;
+  // Seriler
+  const gelirSeries = useMemo(() => seriesFrom([...salesInv, ...incomes], (r) => r.date, (r) => r.grandTotal ?? r.amount), [salesInv, incomes]);
+  const giderSeries = useMemo(() => seriesFrom([...purchInv, ...expenses], (r) => r.date, (r) => r.grandTotal ?? r.amount), [purchInv, expenses]);
+  const tahsilatSeries = useMemo(() => seriesFrom(tahsilatlar, (r) => r.date, (r) => r.amount), [tahsilatlar]);
+  const chart = useMemo(() => gelirSeries.map((g) => ({ ay: g.ay, tutar: g.v })), [gelirSeries]);
+  const avgIncome = gelirSeries.reduce((s, x) => s + x.v, 0) / (gelirSeries.length || 1);
+  const avgExpense = giderSeries.reduce((s, x) => s + x.v, 0) / (giderSeries.length || 1);
 
-  // Son 7 ay gelir (istatistik grafiği)
-  const chart = useMemo(() => {
-    const map = {};
-    [...salesInv, ...incomes].forEach((r) => {
-      const k = monthKey(r.date);
-      if (k) map[k] = (map[k] || 0) + (Number(r.grandTotal ?? r.amount) || 0);
-    });
-    const out = [];
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const k = monthKey(d);
-      out.push({ ay: monthLabel(k).split(' ')[0].slice(0, 3), tutar: map[k] || 0 });
-    }
-    return out;
-  }, [salesInv, incomes]);
-  const maxIdx = chart.reduce((m, c, i, a) => (c.tutar > a[m].tutar ? i : m), 0);
-  const statChange = chart.length >= 2 && chart[chart.length - 2].tutar > 0
-    ? ((chart[chart.length - 1].tutar - chart[chart.length - 2].tutar) / chart[chart.length - 2].tutar) * 100
-    : null;
-
-  // Son hareketler
+  // Son işlemler
   const recent = useMemo(() => {
     const items = [
-      ...salesInv.map((i) => ({ name: i.customerSnapshot?.name, sub: `${i.docNumber} · Satış`, amount: i.grandTotal, tag: 'Satış', color: 'sky', date: toDate(i.date) })),
-      ...transactions.filter((t) => t.type === 'tahsilat').map((t) => ({ name: t.customerName, sub: 'Tahsilat', amount: t.amount, tag: 'Tahsilat', color: 'emerald', date: toDate(t.date) })),
+      ...salesInv.map((i) => ({ name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Satış', neg: false, date: toDate(i.date) })),
+      ...purchInv.map((i) => ({ name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Alış', neg: true, date: toDate(i.date) })),
+      ...tahsilatlar.map((t) => ({ name: t.customerName, doc: 'Tahsilat', amount: t.amount, tag: 'Tahsilat', neg: false, date: toDate(t.date) })),
     ];
-    return items.filter((x) => x.date).sort((a, b) => b.date - a.date).slice(0, 5);
-  }, [salesInv, transactions]);
-
-  const periodLabel = { today: 'Bugün', week: 'Bu Hafta', month: 'Bu Ay' }[period];
+    return items.filter((x) => x.date).sort((a, b) => b.date - a.date).slice(0, 6);
+  }, [salesInv, purchInv, tahsilatlar]);
 
   const handleExport = () => {
     const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
     const today = new Date().toLocaleDateString('tr-TR');
     const blocks = [
       { heading: `SATIŞ ÖZETİ — ${today}` },
-      {
-        headers: ['Özet', 'Tutar (TL)'],
-        rows: [
-          ['Toplam Gelir', round(totalIncome)],
-          ['Toplam Gider', round(totalExpense)],
-          ['Net (Kâr/Zarar)', round(totalIncome - totalExpense)],
-          ['Kasa/Banka Bakiye', round(cashTotal)],
-          ['Toplam Alacak', round(receivable)],
-          ['Tahsilat Oranı (%)', Math.round(collectionRate)],
-        ],
-      },
-      {
-        heading: 'Kasa / Banka Bakiyeleri',
-        headers: ['Hesap', 'Bakiye (TL)'],
-        rows: accounts.map((a) => [a.name, round(accBalances[a.id] || 0)]),
-      },
-      {
-        heading: 'Cari Bakiyeleri',
-        headers: ['Cari', 'Bakiye (TL)', 'Durum'],
-        rows: customers.map((c) => {
-          const b = cariBalances[c.id] || 0;
-          return [c.name, round(b), Math.abs(b) < 0.01 ? '-' : b > 0 ? 'Borç (bize)' : 'Alacak (bizden)'];
-        }),
-      },
-      {
-        heading: 'Aylık Gelir (Son 7 Ay)',
-        headers: ['Ay', 'Gelir (TL)'],
-        rows: chart.map((c) => [c.ay, round(c.tutar)]),
-      },
+      { headers: ['Özet', 'Tutar (TL)'], rows: [
+        ['Toplam Gelir', round(totalIncome)], ['Toplam Gider', round(totalExpense)],
+        ['Net (Kâr/Zarar)', round(totalIncome - totalExpense)], ['Toplam Tahsilat', round(tahsilatTotal)],
+        ['Kasa/Banka Bakiye', round(cashTotal)], ['Toplam Alacak', round(receivable)],
+      ] },
+      { heading: 'Kasa / Banka Bakiyeleri', headers: ['Hesap', 'Bakiye (TL)'], rows: accounts.map((a) => [a.name, round(accBalances[a.id] || 0)]) },
+      { heading: 'Cari Bakiyeleri', headers: ['Cari', 'Bakiye (TL)', 'Durum'], rows: customers.map((c) => { const b = cariBalances[c.id] || 0; return [c.name, round(b), Math.abs(b) < 0.01 ? '-' : b > 0 ? 'Borç (bize)' : 'Alacak (bizden)']; }) },
+      { heading: 'Aylık Gelir (Son 7 Ay)', headers: ['Ay', 'Gelir (TL)'], rows: chart.map((c) => [c.ay, round(c.tutar)]) },
     ];
     downloadExcel(`satis-ozeti-${today.replace(/\./g, '-')}`, blocks);
   };
+
+  const card = 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm';
+  const heading = 'text-gray-800 dark:text-gray-100';
+  const muted = 'text-gray-400 dark:text-gray-500';
 
   return (
    <div className={dark ? 'dark' : ''}>
@@ -189,165 +150,146 @@ export default function Dashboard({ data, setPage }) {
       {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">Satış Özeti</h1>
-          <p className="text-sm text-gray-400 mt-1">Güncel finansal durumunuz ve hareketler</p>
+          <h1 className={`text-2xl sm:text-3xl font-bold ${heading}`}>Tekrar hoş geldiniz 👋</h1>
+          <p className={`text-sm mt-1 ${muted}`}>Gelir, gider ve tahsilatlarınızı takip edin.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={toggleDark} title={dark ? 'Açık moda geç' : 'Koyu moda geç'} className="flex items-center justify-center w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-yellow-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-            {dark ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
-          <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"><Download size={15} />Excel'e Aktar</button>
-          <button onClick={() => setPage('reports')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-gradient-to-r from-sky-500 to-cyan-500 hover:opacity-90 shadow-sm"><SlidersHorizontal size={15} />Raporlar</button>
+          <button onClick={toggleDark} title={dark ? 'Açık mod' : 'Koyu mod'} className={`flex items-center justify-center w-10 h-10 rounded-full ${card} text-gray-600 dark:text-yellow-300 hover:opacity-90`}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
+          <button onClick={() => setPage('reports')} className={`flex items-center gap-1.5 px-4 py-2 rounded-full ${card} text-sm font-medium text-gray-600 dark:text-gray-200 hover:opacity-90`}><Filter size={15} />Raporlar</button>
+          <button onClick={handleExport} className={`flex items-center gap-1.5 px-4 py-2 rounded-full ${card} text-sm font-medium text-gray-600 dark:text-gray-200 hover:opacity-90`}><Download size={15} />Excel</button>
+          <button onClick={() => setPage('invoices')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-orange-600 hover:bg-orange-700 shadow-sm"><FileText size={15} />Fatura Ekle</button>
         </div>
       </div>
 
       {/* Uyarı şeridi */}
       {(unpaidInvoices > 0 || lowStock > 0) && (
         <div className="flex flex-wrap gap-2 mb-5">
-          {unpaidInvoices > 0 && (
-            <button onClick={() => setPage('invoices')} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100"><FileText size={13} />{unpaidInvoices} ödenmemiş fatura</button>
-          )}
-          {lowStock > 0 && (
-            <button onClick={() => setPage('products')} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-medium hover:bg-rose-100"><AlertTriangle size={13} />{lowStock} kritik stok</button>
-          )}
+          {unpaidInvoices > 0 && <button onClick={() => setPage('invoices')} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100"><FileText size={13} />{unpaidInvoices} ödenmemiş fatura</button>}
+          {lowStock > 0 && <button onClick={() => setPage('products')} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-medium hover:bg-rose-100"><AlertTriangle size={13} />{lowStock} kritik stok</button>}
         </div>
       )}
 
-      {/* Üst kartlar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
-        {/* Sol sütun: gelir (koyu) + gider (beyaz) */}
-        <div className="flex flex-col gap-5">
-          <div className="rounded-2xl p-5 bg-gradient-to-br from-[#15325a] to-[#1f4e7e] text-white shadow-md relative overflow-hidden">
-            <div className="flex justify-between items-start">
-              <span className="text-sm text-white/70">Toplam Gelir</span>
-              <MoreHorizontal size={18} className="text-white/50" />
+      {/* 1. SATIR: Özet + Hareketler */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+        {/* Özet */}
+        <div className={`rounded-3xl p-5 ${card}`}>
+          <div className="flex justify-between items-center mb-1">
+            <div>
+              <h3 className={`font-semibold ${heading}`}>Özet</h3>
+              <p className={`text-xs ${muted}`}>Performansınızı takip edin</p>
             </div>
-            <div className="flex items-end gap-2 mt-3">
-              <span className="text-3xl font-bold tracking-tight">{formatCurrency(totalIncome)}</span>
-            </div>
-            <div className="mt-2"><ChangeBadge value={incomeChange} light /> <span className="text-xs text-white/60 ml-1">geçen aya göre</span></div>
+            <select value={period} onChange={(e) => setPeriod(e.target.value)} className="text-xs font-medium rounded-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 px-3 py-1.5 outline-none">
+              <option value="today">Bugün</option>
+              <option value="week">Haftalık</option>
+              <option value="month">Aylık</option>
+            </select>
           </div>
-          <div className="rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm">
-            <div className="flex justify-between items-start">
-              <span className="text-sm text-gray-400">Toplam Gider</span>
-              <MoreHorizontal size={18} className="text-gray-300" />
+          <div className="rounded-2xl bg-gray-50 dark:bg-gray-900/40 p-4 mt-3">
+            <div className="flex gap-6 mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><TrendingDown size={13} /></span>Toplam Gelir</div>
+                <p className={`text-2xl font-bold mt-1 ${heading}`}>{formatCurrency(periodIncome)}</p>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center"><TrendingUp size={13} /></span>Toplam Gider</div>
+                <p className={`text-2xl font-bold mt-1 ${heading}`}>{formatCurrency(periodExpense)}</p>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-3">{formatCurrency(totalExpense)}</div>
-            <div className="mt-2"><ChangeBadge value={expenseChange} /> <span className="text-xs text-gray-400 ml-1">geçen aya göre</span></div>
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={chart} margin={{ top: 6, right: 0, left: 0, bottom: 0 }} barCategoryGap="26%">
+                <XAxis dataKey="ay" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                <Tooltip cursor={{ fill: 'transparent' }} formatter={(v) => formatCurrency(v)} contentStyle={{ borderRadius: 12, border: '1px solid #eee', fontSize: 12 }} />
+                <Bar dataKey="tutar" radius={[8, 8, 8, 8]} maxBarSize={26}>
+                  {chart.map((c, i) => <Cell key={i} fill={i >= chart.length - 3 ? '#ea580c' : '#fcd9b6'} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Orta: dönemsel akış */}
-        <div className="rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-500">Nakit Akışı</span>
-            <MoreHorizontal size={18} className="text-gray-300" />
+        {/* Hareketler */}
+        <div>
+          <div className="mb-3">
+            <h3 className={`font-semibold ${heading}`}>Hareketler</h3>
+            <p className={`text-xs ${muted}`}>Akışınızı takip edin</p>
           </div>
-          <div className="flex gap-1 mt-3">
-            {[{ k: 'today', l: 'Bugün' }, { k: 'week', l: 'Hafta' }, { k: 'month', l: 'Ay' }].map((t) => (
-              <button key={t.k} onClick={() => setPeriod(t.k)} className={`px-3 py-1 rounded-full text-xs font-medium ${period === t.k ? 'bg-sky-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>{t.l}</button>
-            ))}
-          </div>
-          <div className="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-4">{formatCurrency(periodIncome)}</div>
-          <p className="text-xs text-gray-400 mt-1">{periodLabel} toplam tahsilat / gelir</p>
-          <div className="mt-4">
-            <div className="h-3 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-              <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-400" style={{ width: `${flowRatio}%` }} />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Tahsilat */}
+            <div className={`rounded-3xl p-4 ${card}`}>
+              <p className={`text-sm font-medium ${heading}`}>Tahsilat</p>
+              <div className="mt-2"><ChangeBadge value={tahsilatChange} /></div>
+              <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(tahsilatTotal)}</p>
+              <div className="mt-2"><Spark data={tahsilatSeries} color="#ea580c" id="t" /></div>
             </div>
-            <div className="flex justify-between text-xs text-gray-400 mt-2">
-              <span>Gider: {formatCurrency(periodExpense)}</span>
-              <span className="text-emerald-600 font-medium">Net {formatCurrency(periodIncome - periodExpense)}</span>
+            {/* Gelir */}
+            <div className={`rounded-3xl p-4 ${card}`}>
+              <p className={`text-sm font-medium ${heading}`}>Gelir</p>
+              <div className="mt-2"><ChangeBadge value={incomeChange} /></div>
+              <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(totalIncome)}</p>
+              <div className="mt-2"><Spark data={gelirSeries} color="#f59e0b" id="g" /></div>
             </div>
-          </div>
-        </div>
-
-        {/* Sağ: tahsilat oranı gauge */}
-        <div className="rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-500">Tahsilat Durumu</span>
-            <MoreHorizontal size={18} className="text-gray-300" />
-          </div>
-          <div className="relative mt-4">
-            <Gauge percent={collectionRate} />
-            <div className="absolute inset-x-0 bottom-1 flex flex-col items-center">
-              <span className="text-3xl font-bold text-gray-800 dark:text-gray-100">%{collectionRate.toFixed(0)}</span>
-              <span className="text-xs text-gray-400">tahsil edildi</span>
+            {/* Gider (koyu) */}
+            <div className="rounded-3xl p-4 bg-gradient-to-br from-[#3a2415] to-[#5a3010] text-white shadow-md">
+              <p className="text-sm font-medium">Gider</p>
+              <div className="mt-2"><ChangeBadge value={expenseChange} light /></div>
+              <p className="text-xl font-bold mt-2">{formatCurrency(totalExpense)}</p>
+              <div className="mt-2"><Spark data={giderSeries} color="#fb923c" id="e" /></div>
             </div>
-          </div>
-          <div className="flex justify-between items-center mt-3 text-xs text-gray-400">
-            <span>Toplam alacak</span>
-            <span className="inline-flex items-center gap-1 font-medium text-rose-600">{formatCurrency(receivable)}</span>
           </div>
         </div>
       </div>
 
-      {/* Alt: istatistik grafiği + son hareketler */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">İstatistik</h3>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xl font-bold text-gray-800 dark:text-gray-100">{statChange !== null ? `${statChange >= 0 ? '+' : ''}${statChange.toFixed(0)}%` : '—'}</span>
-                <ChangeBadge value={statChange} />
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Son 7 ay aylık gelir</p>
+      {/* 2. SATIR: Ortalamalar + İşlem geçmişi */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-2 gap-5 content-start">
+          {[
+            { label: 'Aylık Ort. Gelir', value: avgIncome, icon: TrendingUp, c: 'text-emerald-600 bg-emerald-50', ch: incomeChange },
+            { label: 'Aylık Ort. Gider', value: avgExpense, icon: TrendingDown, c: 'text-orange-600 bg-orange-50', ch: expenseChange },
+            { label: 'Kasa / Banka', value: cashTotal, icon: Wallet, c: 'text-violet-600 bg-violet-50' },
+            { label: 'Toplam Alacak', value: receivable, icon: ArrowUpRight, c: 'text-rose-600 bg-rose-50' },
+          ].map((s, i) => (
+            <div key={i} className={`rounded-3xl p-5 ${card}`}>
+              <div className="flex items-center gap-2 text-xs text-gray-500"><span className={`w-7 h-7 rounded-lg flex items-center justify-center ${s.c}`}><s.icon size={15} /></span>{s.label}</div>
+              {s.ch !== undefined && <div className="mt-2"><ChangeBadge value={s.ch} /></div>}
+              <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(s.value)}</p>
             </div>
+          ))}
+          <div className="col-span-2 rounded-3xl p-5 bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md flex items-center justify-between">
+            <div>
+              <p className="font-semibold">Net Durum</p>
+              <p className="text-xs text-white/70 mt-0.5">Gelir − Gider</p>
+            </div>
+            <p className="text-2xl font-bold">{formatCurrency(totalIncome - totalExpense)}</p>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={chart} margin={{ top: 10, right: 0, left: 0, bottom: 0 }} barCategoryGap="28%">
-              <XAxis dataKey="ay" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-              <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(v) => formatCurrency(v)} contentStyle={{ borderRadius: 12, border: '1px solid #eef2f6', fontSize: 12 }} />
-              <Bar dataKey="tutar" radius={[10, 10, 10, 10]} maxBarSize={42}>
-                {chart.map((c, i) => <Cell key={i} fill={i === maxIdx ? '#2dd4bf' : '#dbeafe'} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
         </div>
 
-        <div className="rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 bg-gradient-to-br from-sky-50 to-cyan-50/40 dark:from-gray-800 dark:to-gray-800">
+        {/* İşlem Geçmişi */}
+        <div className={`rounded-3xl p-5 ${card}`}>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-200">Son Hareketler</h3>
-            <MoreHorizontal size={18} className="text-gray-300" />
+            <div>
+              <h3 className={`font-semibold ${heading}`}>İşlem Geçmişi</h3>
+              <p className={`text-xs ${muted}`}>Son hareketleriniz</p>
+            </div>
+            <button onClick={() => setPage('invoices')} className="text-xs font-medium text-orange-600 hover:text-orange-700">Tümü</button>
           </div>
           {recent.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm py-10">Henüz hareket yok</p>
+            <p className={`text-center text-sm py-10 ${muted}`}>Henüz hareket yok</p>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
               {recent.map((r, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white dark:bg-gray-700/60 rounded-xl px-3 py-2.5 shadow-sm">
+                <div key={i} className="flex items-center gap-3 py-2.5">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>{initials(r.name)}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{r.name || '—'}</p>
-                    <p className="text-xs text-gray-400 truncate">{r.sub}</p>
+                    <p className={`text-sm font-medium truncate ${heading}`}>{r.name || '—'}</p>
+                    <p className={`text-xs truncate ${muted}`}>{r.doc} · {formatDateShort(r.date)}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{formatCurrency(r.amount)}</p>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${r.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{r.tag}</span>
-                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${r.tag === 'Tahsilat' ? 'bg-emerald-100 text-emerald-700' : r.tag === 'Alış' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>{r.tag}</span>
+                  <p className={`text-sm font-semibold w-24 text-right ${r.neg ? 'text-rose-600' : 'text-gray-800 dark:text-gray-100'}`}>{r.neg ? '-' : ''}{formatCurrency(r.amount)}</p>
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
-
-      {/* Mini istatistik kartları */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-5">
-        {[
-          { label: 'Kasa/Banka', value: formatCurrency(cashTotal), icon: Wallet, c: 'text-sky-600 bg-sky-50' },
-          { label: 'Toplam Alacak', value: formatCurrency(receivable), icon: ArrowUpRight, c: 'text-rose-600 bg-rose-50' },
-          { label: 'Cari Sayısı', value: customers.length, icon: Users, c: 'text-violet-600 bg-violet-50' },
-          { label: 'Ürün/Hizmet', value: products.length, icon: Package, c: 'text-emerald-600 bg-emerald-50' },
-        ].map((s, i) => (
-          <div key={i} className="rounded-2xl p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.c}`}><s.icon size={20} /></div>
-            <div className="min-w-0">
-              <p className="text-xs text-gray-400">{s.label}</p>
-              <p className="text-lg font-bold text-gray-800 dark:text-gray-100 truncate">{s.value}</p>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
    </div>

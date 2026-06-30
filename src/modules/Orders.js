@@ -58,12 +58,12 @@ export default function Orders({ data, userId }) {
 
       <div className="flex gap-2 mb-4">
         {[{ k: 'sales', l: 'Satış Siparişleri' }, { k: 'purchase', l: 'Alış Siparişleri' }].map((t) => (
-          <button key={t.k} onClick={() => setKind(t.k)} className={`px-4 py-2 rounded-lg text-sm font-medium ${kind === t.k ? 'bg-sky-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{t.l}</button>
+          <button key={t.k} onClick={() => setKind(t.k)} className={`px-4 py-2 rounded-lg text-sm font-medium ${kind === t.k ? 'bg-orange-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{t.l}</button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <StatCard title="Sipariş Sayısı" value={list.length} icon={ClipboardList} color="text-sky-600" />
+        <StatCard title="Sipariş Sayısı" value={list.length} icon={ClipboardList} color="text-orange-600" />
         <StatCard title="Toplam Tutar" value={formatCurrency(sum(list, (o) => o.grandTotal))} color="text-gray-700" />
       </div>
 

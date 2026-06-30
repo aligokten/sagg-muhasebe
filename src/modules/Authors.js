@@ -60,7 +60,7 @@ export default function Authors({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <StatCard title="Müellif Sayısı" value={authors.length} icon={DraftingCompass} color="text-sky-600" />
+        <StatCard title="Müellif Sayısı" value={authors.length} icon={DraftingCompass} color="text-orange-600" />
         <StatCard title="Toplam Kalan Borç" value={formatCurrency(grandRemaining)} color="text-red-600" hint="Müelliflere ödenecek" />
       </div>
 

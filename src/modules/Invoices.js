@@ -77,7 +77,7 @@ export default function Invoices({ data, userId }) {
           <button
             key={t.k}
             onClick={() => setKind(t.k)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${kind === t.k ? 'bg-sky-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${kind === t.k ? 'bg-orange-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
             {t.l}
           </button>
@@ -85,7 +85,7 @@ export default function Invoices({ data, userId }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Fatura Sayısı" value={stats.count} icon={FileText} color="text-sky-600" />
+        <StatCard title="Fatura Sayısı" value={stats.count} icon={FileText} color="text-orange-600" />
         <StatCard title="Toplam Tutar" value={formatCurrency(stats.total)} color="text-gray-700" />
         <StatCard title="Bekleyen Ödeme" value={formatCurrency(stats.unpaid)} color="text-red-600" />
       </div>

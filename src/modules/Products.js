@@ -160,7 +160,7 @@ export default function Products({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Ürün / Hizmet" value={products.length} icon={Package} color="text-sky-600" />
+        <StatCard title="Ürün / Hizmet" value={products.length} icon={Package} color="text-orange-600" />
         <StatCard title="Kritik Stok" value={lowStock} icon={AlertTriangle} color="text-red-600" />
         <StatCard title="Stok Değeri (maliyet)" value={formatCurrency(stockValue)} color="text-gray-700" />
       </div>

@@ -81,7 +81,7 @@ export default function Personnel({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Toplam Personel" value={personnel.length} icon={UserCog} color="text-sky-600" />
+        <StatCard title="Toplam Personel" value={personnel.length} icon={UserCog} color="text-orange-600" />
         <StatCard title="Aktif Personel" value={active.length} color="text-green-600" />
         <StatCard title="Aylık Maaş Toplamı" value={formatCurrency(payroll)} color="text-gray-700" />
       </div>

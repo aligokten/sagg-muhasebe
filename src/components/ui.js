@@ -4,7 +4,7 @@ import { X, PlusCircle, Inbox, MoreVertical } from 'lucide-react';
 
 export const Spinner = () => (
   <div className="flex items-center justify-center h-full py-20">
-    <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-sky-500"></div>
+    <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-orange-500"></div>
   </div>
 );
 
@@ -20,7 +20,7 @@ export const PageHeader = ({ title, subtitle, children }) => (
 
 export const Button = ({ children, variant = 'primary', icon: Icon, className = '', ...props }) => {
   const variants = {
-    primary: 'bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-300',
+    primary: 'bg-orange-600 text-white hover:bg-orange-700 focus:ring-orange-300',
     secondary: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-200',
     success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-300',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-300',
@@ -42,7 +42,7 @@ export const AddButton = ({ label = 'Yeni Ekle', onClick }) => (
 );
 
 export const Card = ({ title, children, className = '', actions }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-gray-200 ${className}`}>
+  <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 ${className}`}>
     {(title || actions) && (
       <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
         {title && <h3 className="text-lg font-semibold text-gray-700">{title}</h3>}
@@ -54,7 +54,7 @@ export const Card = ({ title, children, className = '', actions }) => (
 );
 
 export const StatCard = ({ title, value, color = 'text-gray-700', icon: Icon, hint }) => (
-  <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
     <div className="flex flex-col">
       <h4 className="text-sm font-medium text-gray-500">{title}</h4>
       <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
@@ -75,7 +75,7 @@ export const Badge = ({ children, color = 'gray' }) => {
     red: 'bg-red-100 text-red-700',
     yellow: 'bg-yellow-100 text-yellow-700',
     blue: 'bg-blue-100 text-blue-700',
-    sky: 'bg-sky-100 text-sky-700',
+    sky: 'bg-orange-100 text-orange-700',
     purple: 'bg-purple-100 text-purple-700',
   };
   return (
@@ -131,7 +131,7 @@ export const Field = ({ label, children, className = '' }) => (
 );
 
 const inputClass =
-  'p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none w-full bg-white';
+  'p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none w-full bg-white';
 
 export const Input = (props) => <input className={inputClass} {...props} />;
 export const Textarea = (props) => <textarea className={`${inputClass} h-24`} {...props} />;

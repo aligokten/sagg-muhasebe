@@ -81,12 +81,12 @@ export default function Checks({ data, userId }) {
 
       <div className="flex gap-2 mb-4">
         {[{ k: 'received', l: 'Alınan (Tahsil)' }, { k: 'issued', l: 'Verilen (Ödeme)' }].map((t) => (
-          <button key={t.k} onClick={() => setTab(t.k)} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === t.k ? 'bg-sky-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{t.l}</button>
+          <button key={t.k} onClick={() => setTab(t.k)} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === t.k ? 'bg-orange-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{t.l}</button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <StatCard title="Adet" value={list.length} icon={ScrollText} color="text-sky-600" />
+        <StatCard title="Adet" value={list.length} icon={ScrollText} color="text-orange-600" />
         <StatCard title="Portföydeki Toplam" value={formatCurrency(portfolioTotal)} color={isReceived ? 'text-green-600' : 'text-red-600'} />
       </div>
 

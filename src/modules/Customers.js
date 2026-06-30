@@ -156,7 +156,7 @@ function PaymentForm({ type, customer, userId, accounts, projects, lockedProject
     <FormModal title={`${customer.name} — ${isCollect ? 'Tahsilat' : 'Ödeme'}`} onSubmit={submit} onClose={onClose}>
       <div className="grid grid-cols-1 gap-4">
         {lockedProjectId ? (
-          <div className="text-sm bg-sky-50 text-sky-800 rounded-md p-2">İş: <b>{lockedProject?.name}</b></div>
+          <div className="text-sm bg-orange-50 text-orange-800 rounded-md p-2">İş: <b>{lockedProject?.name}</b></div>
         ) : projects.length > 0 ? (
           <Field label="İş / Proje"><Select name="projectId" value={form.projectId} onChange={set}><option value="">Genel (işe bağlı değil)</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         ) : null}
@@ -286,7 +286,7 @@ function TransactionForm({ customer, existing, userId, accounts, projects, onClo
     <FormModal title="Hareket Düzenle" onSubmit={submit} onClose={onClose}>
       <div className="flex flex-wrap gap-1 mb-3">
         {[['tahsilat', 'Tahsilat'], ['odeme', 'Ödeme'], ['satis', 'Satış (Borç)'], ['alis', 'Alış (Alacak)']].map(([k, l]) => (
-          <button type="button" key={k} onClick={() => setForm((f) => ({ ...f, action: k }))} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${form.action === k ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+          <button type="button" key={k} onClick={() => setForm((f) => ({ ...f, action: k }))} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${form.action === k ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4">
@@ -375,7 +375,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
       <button onClick={onBack} className="flex items-center text-sm text-gray-500 hover:text-gray-800 mb-4"><ArrowLeft size={16} className="mr-1" />{customer.name} işlerine dön</button>
       <div className="flex flex-col lg:flex-row justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Briefcase size={22} className="text-sky-600" />{project.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Briefcase size={22} className="text-orange-600" />{project.name}</h1>
           <p className="text-sm text-gray-500 mt-1">{customer.name}{project.address ? ` · ${project.address}` : ''}</p>
           {project.description && <p className="text-sm text-gray-500 mt-1">{project.description}</p>}
         </div>
@@ -502,7 +502,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
             {customerProjects.map((p) => (
               <tr key={p.id} className="hover:bg-gray-50">
                 <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setSelectedProject(p)}>
-                  <span className="flex items-center gap-2"><Briefcase size={15} className="text-sky-600" />{p.name}</span>
+                  <span className="flex items-center gap-2"><Briefcase size={15} className="text-orange-600" />{p.name}</span>
                 </Td>
                 <Td className="text-gray-500">{p.address || '-'}</Td>
                 <Td><Badge color={p.status === 'done' ? 'green' : p.status === 'paused' ? 'yellow' : 'sky'}>{p.status === 'done' ? 'Tamamlandı' : p.status === 'paused' ? 'Beklemede' : 'Devam Ediyor'}</Badge></Td>
@@ -563,7 +563,7 @@ export default function Customers({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Cari Sayısı" value={customers.length} icon={Users} color="text-sky-600" />
+        <StatCard title="Cari Sayısı" value={customers.length} icon={Users} color="text-orange-600" />
         <StatCard title="Toplam Alacak" value={formatCurrency(totalReceivable)} color="text-red-600" hint="Bizden alacaklı olduğumuz" />
         <StatCard title="Toplam Borç" value={formatCurrency(totalPayable)} color="text-green-600" hint="Bizim borçlu olduğumuz" />
       </div>
