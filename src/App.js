@@ -11,6 +11,7 @@ import {
 } from './firebase';
 import { Spinner } from './components/ui';
 import AuthModal from './components/AuthModal';
+import { COLLECTIONS } from './constants';
 
 import Dashboard from './modules/Dashboard';
 import Customers from './modules/Customers';
@@ -28,13 +29,6 @@ import Reports from './modules/Reports';
 import Agenda from './modules/Agenda';
 import Settings from './modules/Settings';
 import ArsaPaylastir from './ArsaPaylastir';
-
-// Dinlenecek koleksiyonlar
-const COLLECTIONS = [
-  'customers', 'projects', 'authors', 'subcontracts', 'products', 'invoices', 'quotes', 'orders', 'waybills',
-  'transactions', 'accounts', 'expenses', 'incomes', 'checks',
-  'personnel', 'stockMovements', 'reminders',
-];
 
 const EMPTY_DATA = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
 
@@ -251,7 +245,7 @@ export default function App() {
       case 'reports': return <Reports data={fullData} />;
       case 'agenda': return <Agenda data={fullData} userId={userId} />;
       case 'arsapay': return <ArsaPaylastir />;
-      case 'settings': return <Settings userId={userId} companyProfile={data.companyProfile} />;
+      case 'settings': return <Settings userId={userId} companyProfile={data.companyProfile} data={fullData} />;
       default: return <Dashboard data={fullData} setPage={setCurrentPage} />;
     }
   };

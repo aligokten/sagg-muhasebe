@@ -1,10 +1,32 @@
-// --- Ayarlar (Şirket Profili) ---
-import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
+// --- Ayarlar (Şirket Profili + Yedekleme) ---
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, Download, Upload } from 'lucide-react';
 import { setRecord } from '../firebase';
 import { PageHeader, Card, Button, Field, Input, Textarea } from '../components/ui';
+import { downloadBackup, restoreBackup, countRecords } from '../backup';
 
-export default function Settings({ userId, companyProfile }) {
+export default function Settings({ userId, companyProfile, data = {} }) {
+  const fileRef = useRef(null);
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestore = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!window.confirm('Seçilen yedek MEVCUT hesaba EKLENECEK (üzerine yazmaz). Boş bir hesaba yüklemeniz önerilir. Devam edilsin mi?')) return;
+    setRestoring(true);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const n = await restoreBackup(userId, parsed);
+      alert(`${n} kayıt geri yüklendi. Veriler birkaç saniye içinde görünecek.`);
+    } catch (err) {
+      console.error(err);
+      alert('Geri yükleme başarısız: ' + (err.message || 'Geçersiz dosya'));
+    } finally {
+      setRestoring(false);
+    }
+  };
   const [profile, setProfile] = useState({
     companyName: '', address: '', taxOffice: '', taxId: '', phone: '', email: '', website: '',
     bankAccounts: [{ bankName: '', iban: '' }],
@@ -61,10 +83,32 @@ export default function Settings({ userId, companyProfile }) {
         </div>
       </Card>
 
-      <div className="flex justify-end items-center gap-3">
+      <div className="flex justify-end items-center gap-3 mb-8">
         {saved && <span className="text-sm text-green-600">Kaydedildi ✓</span>}
         <Button icon={Save} onClick={save}>Kaydet</Button>
       </div>
+
+      <Card title="Veri Yedekleme / Taşıma" className="mb-6">
+        <div className="p-6">
+          <p className="text-sm text-gray-500 mb-4">
+            Tüm verilerinizi (<b>{countRecords(data)}</b> kayıt) bir JSON dosyasına yedekleyebilir veya başka bir
+            hesaba/cihaza taşımak için geri yükleyebilirsiniz.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button icon={Download} variant="secondary" onClick={() => downloadBackup(data)}>Yedek Al (JSON indir)</Button>
+            <Button icon={Upload} onClick={() => fileRef.current?.click()} disabled={restoring}>
+              {restoring ? 'Yükleniyor...' : 'Yedeği Geri Yükle'}
+            </Button>
+            <input ref={fileRef} type="file" accept="application/json,.json" onChange={handleRestore} className="hidden" />
+          </div>
+          <div className="mt-5 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
+            <p className="font-medium text-gray-600">Misafir verilerini hesaba taşıma:</p>
+            <p>1) Misafir (giriş yapmadan) haldeyken <b>Yedek Al</b> ile dosyayı indirin.</p>
+            <p>2) Sol menüden hesabınıza <b>Giriş Yap</b>.</p>
+            <p>3) Bu sayfada <b>Yedeği Geri Yükle</b> ile indirdiğiniz dosyayı seçin. Verileriniz hesaba taşınır ve tüm cihazlara senkron olur.</p>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
