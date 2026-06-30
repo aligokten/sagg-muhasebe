@@ -7,3 +7,38 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Cam efekti (glassmorphism) yardımcı sınıfı */
+.glass {
+  background-color: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+.dark .glass {
+  background-color: rgba(31, 41, 55, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* --- Uygulama geneli KOYU MOD (sınıf tabanlı override) --- */
+.dark body { background-color: #0b1220; color: #e5e7eb; }
+.dark .bg-white { background-color: #1f2937 !important; }
+.dark .bg-gray-50 { background-color: #111827 !important; }
+.dark .bg-gray-100 { background-color: #0b1220 !important; }
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700 { color: #f1f5f9 !important; }
+.dark .text-gray-600 { color: #cbd5e1 !important; }
+.dark .text-gray-500 { color: #9aa6b5 !important; }
+.dark .text-gray-400 { color: #6b7280 !important; }
+.dark .border-gray-200,
+.dark .border-gray-100 { border-color: #374151 !important; }
+.dark .border-gray-300 { border-color: #4b5563 !important; }
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover { background-color: #374151 !important; }
+.dark .hover\:bg-gray-200:hover { background-color: #4b5563 !important; }
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #374151 !important; }
+/* form alanları için odak/zemin uyumu */
+.dark select option { background-color: #1f2937; color: #f1f5f9; }

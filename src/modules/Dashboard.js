@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import {
   ArrowUpRight, ArrowDownRight, Download, Filter,
-  Wallet, FileText, AlertTriangle, Moon, Sun, TrendingDown, TrendingUp,
+  Wallet, FileText, AlertTriangle, TrendingDown, TrendingUp,
 } from 'lucide-react';
 import { formatCurrency, monthKey, monthLabel, toDate, formatDateShort, sum } from '../utils';
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
@@ -70,14 +70,6 @@ const monthChange = (records, getDate, getAmt) => {
 export default function Dashboard({ data, setPage }) {
   const { invoices = [], expenses = [], incomes = [], customers = [], products = [], accounts = [], transactions = [] } = data;
   const [period, setPeriod] = useState('month');
-  const [dark, setDark] = useState(() => {
-    try { return localStorage.getItem('sagg-dash-dark') === '1'; } catch { return false; }
-  });
-  const toggleDark = () => setDark((d) => {
-    const nd = !d;
-    try { localStorage.setItem('sagg-dash-dark', nd ? '1' : '0'); } catch { /* yoksay */ }
-    return nd;
-  });
 
   const cariBalances = useMemo(() => allCariBalances(data), [data]);
   const accBalances = useMemo(() => allAccountBalances(data), [data]);
@@ -145,16 +137,14 @@ export default function Dashboard({ data, setPage }) {
   const muted = 'text-gray-400 dark:text-gray-500';
 
   return (
-   <div className={dark ? 'dark' : ''}>
-    <div className="dark:bg-gray-900 min-h-screen -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8 transition-colors">
+    <div>
       {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
           <h1 className={`text-2xl sm:text-3xl font-bold ${heading}`}>Tekrar hoş geldiniz 👋</h1>
           <p className={`text-sm mt-1 ${muted}`}>Gelir, gider ve tahsilatlarınızı takip edin.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={toggleDark} title={dark ? 'Açık mod' : 'Koyu mod'} className={`flex items-center justify-center w-10 h-10 rounded-full ${card} text-gray-600 dark:text-yellow-300 hover:opacity-90`}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setPage('reports')} className={`flex items-center gap-1.5 px-4 py-2 rounded-full ${card} text-sm font-medium text-gray-600 dark:text-gray-200 hover:opacity-90`}><Filter size={15} />Raporlar</button>
           <button onClick={handleExport} className={`flex items-center gap-1.5 px-4 py-2 rounded-full ${card} text-sm font-medium text-gray-600 dark:text-gray-200 hover:opacity-90`}><Download size={15} />Excel</button>
           <button onClick={() => setPage('invoices')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-orange-600 hover:bg-orange-700 shadow-sm"><FileText size={15} />Fatura Ekle</button>
@@ -295,6 +285,5 @@ export default function Dashboard({ data, setPage }) {
         </div>
       </div>
     </div>
-   </div>
   );
 }
