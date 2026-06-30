@@ -91,7 +91,7 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, 
             <img src={logo} alt="Logo" className="h-10 max-w-[170px] object-contain" />
           ) : (
             <>
-              <span className="text-2xl font-bold text-sky-400">S</span>
+              <span className="text-2xl font-bold text-orange-400">S</span>
               <h1 className="text-lg font-bold ml-2 tracking-wide">SAGG Defter</h1>
             </>
           )}
@@ -107,7 +107,7 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, 
                 <li key={item.id} className="px-2">
                   <button
                     onClick={() => { setCurrentPage(item.id); setMobileOpen(false); }}
-                    className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === item.id ? 'bg-sky-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                    className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === item.id ? 'bg-orange-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
                   >
                     <item.icon className="h-5 w-5 flex-shrink-0" />
                     <span className="ml-3 font-medium">{item.label}</span>
@@ -124,7 +124,7 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, 
             <div className="flex items-center gap-2 text-xs text-amber-300 mb-2">
               <CloudOff size={14} /> Misafir (yalnız bu cihaz)
             </div>
-            <button onClick={onAuth} className="flex items-center justify-center gap-2 w-full bg-sky-600 hover:bg-sky-700 text-white rounded-lg py-2 text-sm font-medium">
+            <button onClick={onAuth} className="flex items-center justify-center gap-2 w-full bg-orange-600 hover:bg-orange-700 text-white rounded-lg py-2 text-sm font-medium">
               <LogIn size={15} /> Giriş / Kayıt Ol
             </button>
             <p className="text-[11px] text-gray-500 mt-2">Çok cihazdan erişim için hesap oluşturun.</p>
@@ -283,7 +283,7 @@ export default function App() {
             <span className="font-bold text-gray-800">SAGG Defter</span>
           )}
           {isAnonymous ? (
-            <button onClick={() => setAuthOpen(true)} className="text-sky-600"><LogIn size={20} /></button>
+            <button onClick={() => setAuthOpen(true)} className="text-orange-600"><LogIn size={20} /></button>
           ) : <span className="w-6" />}
         </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>

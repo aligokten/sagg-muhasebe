@@ -210,12 +210,12 @@ export default function DocumentForm({
                   </div>
                 );
               })}
-              <button type="button" onClick={addItem} className="text-sm font-medium text-sky-600 hover:text-sky-800 mt-2">+ Kalem Ekle</button>
+              <button type="button" onClick={addItem} className="text-sm font-medium text-orange-600 hover:text-orange-800 mt-2">+ Kalem Ekle</button>
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <Field label="Not / Açıklama">
-                <textarea name="note" value={form.note || ''} onChange={setField} className="p-2 border border-gray-300 rounded-md h-24 outline-none focus:ring-2 focus:ring-sky-500" />
+                <textarea name="note" value={form.note || ''} onChange={setField} className="p-2 border border-gray-300 rounded-md h-24 outline-none focus:ring-2 focus:ring-orange-500" />
               </Field>
               <div className="space-y-2 self-end">
                 <div className="flex justify-between text-gray-600"><span>Ara Toplam:</span><span className="font-medium">{formatCurrency(totals.subTotal)}</span></div>

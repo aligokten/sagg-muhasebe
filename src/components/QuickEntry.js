@@ -85,7 +85,7 @@ export default function QuickEntry({ customer, projectId = null, userId, account
         <button
           onClick={save}
           disabled={saving || !(Number(amount) > 0)}
-          className="flex items-center justify-center gap-1 bg-sky-600 text-white rounded-lg py-2 px-4 text-sm font-medium hover:bg-sky-700 disabled:opacity-40 ml-auto"
+          className="flex items-center justify-center gap-1 bg-orange-600 text-white rounded-lg py-2 px-4 text-sm font-medium hover:bg-orange-700 disabled:opacity-40 ml-auto"
         >
           <Check size={16} /> Kaydet
         </button>

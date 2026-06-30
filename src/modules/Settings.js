@@ -148,7 +148,7 @@ export default function Settings({ userId, companyProfile, data = {} }) {
               <button onClick={() => removeBank(i)} className="text-red-500 hover:text-red-700 justify-self-start"><X size={20} /></button>
             </div>
           ))}
-          <button onClick={addBank} className="text-sm font-medium text-sky-600 hover:text-sky-800 mt-1">+ Banka Hesabı Ekle</button>
+          <button onClick={addBank} className="text-sm font-medium text-orange-600 hover:text-orange-800 mt-1">+ Banka Hesabı Ekle</button>
         </div>
       </Card>
 

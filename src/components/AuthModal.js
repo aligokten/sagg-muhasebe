@@ -70,7 +70,7 @@ export default function AuthModal({ isAnonymous, onClose }) {
             key={t.k}
             type="button"
             onClick={() => { setMode(t.k); setErr(''); }}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ${mode === t.k ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ${mode === t.k ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             {t.l}
           </button>
@@ -82,7 +82,7 @@ export default function AuthModal({ isAnonymous, onClose }) {
         <Field label="Şifre"><Input type="password" value={pass} onChange={(e) => setPass(e.target.value)} required minLength={6} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} /></Field>
 
         {mode === 'register' && isAnonymous && (
-          <p className="text-xs text-sky-700 bg-sky-50 rounded-md p-2">
+          <p className="text-xs text-orange-700 bg-orange-50 rounded-md p-2">
             Bu cihazdaki mevcut verileriniz bu hesaba aktarılacak ve diğer cihazlardan da erişilebilir olacak.
           </p>
         )}

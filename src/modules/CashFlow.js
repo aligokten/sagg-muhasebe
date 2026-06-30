@@ -78,7 +78,7 @@ export default function CashFlow({ data, userId }) {
 
       <div className="flex gap-2 mb-4">
         {[{ k: 'expenses', l: 'Giderler' }, { k: 'incomes', l: 'Gelirler' }].map((t) => (
-          <button key={t.k} onClick={() => setTab(t.k)} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === t.k ? 'bg-sky-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{t.l}</button>
+          <button key={t.k} onClick={() => setTab(t.k)} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === t.k ? 'bg-orange-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{t.l}</button>
         ))}
       </div>
 

@@ -68,7 +68,7 @@ export default function Reports({ data }) {
         <div className="p-6 space-y-3">
           <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg"><span className="font-semibold text-green-800">Hesaplanan KDV (Satış)</span><span className="font-bold text-lg text-green-600">{formatCurrency(vat.hesaplanan)}</span></div>
           <div className="flex justify-between items-center p-4 bg-red-50 rounded-lg"><span className="font-semibold text-red-800">İndirilecek KDV (Alış/Gider)</span><span className="font-bold text-lg text-red-600">{formatCurrency(vat.indirilecek)}</span></div>
-          <div className="flex justify-between items-center p-4 bg-sky-50 rounded-lg border-t-2 border-sky-200"><span className="font-semibold text-xl text-sky-800">{vat.odenecek >= 0 ? 'Ödenecek KDV' : 'Devreden KDV'}</span><span className="font-bold text-2xl text-sky-600">{formatCurrency(Math.abs(vat.odenecek))}</span></div>
+          <div className="flex justify-between items-center p-4 bg-orange-50 rounded-lg border-t-2 border-orange-200"><span className="font-semibold text-xl text-orange-800">{vat.odenecek >= 0 ? 'Ödenecek KDV' : 'Devreden KDV'}</span><span className="font-bold text-2xl text-orange-600">{formatCurrency(Math.abs(vat.odenecek))}</span></div>
           <p className="text-xs text-gray-500">* Bu rapor bilgilendirme amaçlıdır. Resmi beyanlar için mali müşavirinize danışın.</p>
         </div>
       </Card>
@@ -79,7 +79,7 @@ export default function Reports({ data }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="text-center"><p className="text-sm text-gray-500">Toplam Gelir</p><p className="text-2xl font-bold text-green-600">{formatCurrency(totalGelir)}</p></div>
             <div className="text-center"><p className="text-sm text-gray-500">Toplam Gider</p><p className="text-2xl font-bold text-red-600">{formatCurrency(totalGider)}</p></div>
-            <div className="text-center"><p className="text-sm text-gray-500">Net Kâr/Zarar</p><p className={`text-2xl font-bold ${totalGelir - totalGider >= 0 ? 'text-sky-600' : 'text-red-600'}`}>{formatCurrency(totalGelir - totalGider)}</p></div>
+            <div className="text-center"><p className="text-sm text-gray-500">Net Kâr/Zarar</p><p className={`text-2xl font-bold ${totalGelir - totalGider >= 0 ? 'text-orange-600' : 'text-red-600'}`}>{formatCurrency(totalGelir - totalGider)}</p></div>
           </div>
           {monthly.length === 0 ? (
             <p className="text-center text-gray-400 py-8">Gösterilecek veri yok</p>

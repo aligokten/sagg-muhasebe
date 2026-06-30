@@ -101,7 +101,7 @@ function AccountDetail({ account, data, userId, onBack }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <StatCard title="Toplam Giriş" value={formatCurrency(rows.reduce((s, r) => s + r.in, 0))} color="text-green-600" />
         <StatCard title="Toplam Çıkış" value={formatCurrency(rows.reduce((s, r) => s + r.out, 0))} color="text-red-600" />
-        <StatCard title="Bakiye" value={formatCurrency(balance)} color={balance >= 0 ? 'text-sky-600' : 'text-red-600'} />
+        <StatCard title="Bakiye" value={formatCurrency(balance)} color={balance >= 0 ? 'text-orange-600' : 'text-red-600'} />
       </div>
       <Card title="Hesap Hareketleri">
         {rows.length === 0 ? <EmptyState message="Henüz hareket yok" /> : (
@@ -148,7 +148,7 @@ export default function Accounts({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <StatCard title="Hesap Sayısı" value={accounts.length} icon={Landmark} color="text-sky-600" />
+        <StatCard title="Hesap Sayısı" value={accounts.length} icon={Landmark} color="text-orange-600" />
         <StatCard title="Toplam Bakiye" value={formatCurrency(total)} color={total >= 0 ? 'text-green-600' : 'text-red-600'} />
       </div>
 

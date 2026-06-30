@@ -46,7 +46,7 @@ export default function Agenda({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Toplam" value={reminders.length} icon={CalendarClock} color="text-sky-600" />
+        <StatCard title="Toplam" value={reminders.length} icon={CalendarClock} color="text-orange-600" />
         <StatCard title="Bekleyen" value={pending.length} icon={Bell} color="text-yellow-600" />
         <StatCard title="Geciken" value={overdue} color="text-red-600" />
       </div>
