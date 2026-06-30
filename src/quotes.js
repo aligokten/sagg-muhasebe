@@ -1,0 +1,31 @@
+// --- Ekonomi & yatırım özdeyişleri (rastgele gösterim) ---
+export const QUOTES = [
+  { text: 'Fiyat, ödediğiniz şeydir; değer ise elde ettiğiniz şey.', author: 'Warren Buffett' },
+  { text: 'Başkaları açgözlüyken korkun, başkaları korkarken açgözlü olun.', author: 'Warren Buffett' },
+  { text: 'Kural 1: Asla para kaybetme. Kural 2: Birinci kuralı asla unutma.', author: 'Warren Buffett' },
+  { text: 'Uyurken para kazanmanın bir yolunu bulamazsan, ölene kadar çalışırsın.', author: 'Warren Buffett' },
+  { text: 'Yatırımcının en büyük düşmanı, çoğu zaman kendisidir.', author: 'Benjamin Graham' },
+  { text: 'Borsa, kısa vadede bir oylama makinesi; uzun vadede ise bir tartı makinesidir.', author: 'Benjamin Graham' },
+  { text: 'Neye, neden sahip olduğunu açıklayamıyorsan o yatırımı yapma.', author: 'Peter Lynch' },
+  { text: 'Düşüşlerde para kaybetmekten çok, düşüşleri beklerken kaçırılan fırsatlarda kaybedilir.', author: 'Peter Lynch' },
+  { text: 'Piyasalar, sizin ödeme gücünüzü koruyabileceğinizden daha uzun süre irrasyonel kalabilir.', author: 'John Maynard Keynes' },
+  { text: 'Zorluk yeni fikirleri geliştirmekte değil, eskilerinden kurtulmaktadır.', author: 'John Maynard Keynes' },
+  { text: 'Samanlıkta iğne aramak yerine, samanlığın tamamını satın alın.', author: 'John C. Bogle' },
+  { text: 'Zaman, piyasayı zamanlamaya çalışmaktan çok daha değerli bir dostunuzdur.', author: 'John C. Bogle' },
+  { text: 'Akşam yemeğimizi fırıncının iyiliğinden değil, kendi çıkarını gözetmesinden bekleriz.', author: 'Adam Smith' },
+  { text: 'Bilgiye yapılan yatırım her zaman en yüksek getiriyi sağlar.', author: 'Benjamin Franklin' },
+  { text: 'Bir kuruş biriktirmek, bir kuruş kazanmaktır.', author: 'Benjamin Franklin' },
+  { text: 'Acı + Değerlendirme = İlerleme.', author: 'Ray Dalio' },
+  { text: 'Nakit çöptür demeyin; ama nakitte de kalmayın — çeşitlendirin.', author: 'Ray Dalio' },
+  { text: 'Zenginler para için çalışmaz; paranın kendileri için çalışmasını sağlar.', author: 'Robert Kiyosaki' },
+  { text: 'Risk, ne yaptığını bilmemekten gelir.', author: 'Warren Buffett' },
+  { text: 'Büyük fırsatlar nadiren gelir; yağmur yağdığında kovayla toplayın, yüksükle değil.', author: 'Warren Buffett' },
+  { text: 'Sabırlı yatırımcı, sabırsızın parasını zamanla kendi cebine aktarır.', author: 'Philip Fisher' },
+  { text: 'Para bir araçtır; onu amaç hâline getiren, ona köle olur.', author: 'Seneca' },
+  { text: 'Bütçesi olmayan bir plan, sadece bir dilektir.', author: 'Antoine de Saint-Exupéry' },
+  { text: 'Bir işletmenin sırrı, başkalarının bilmediği bir şeyi bilmektir.', author: 'Aristoteles Onassis' },
+  { text: 'Bileşik faiz, dünyanın sekizinci harikasıdır; anlayan kazanır, anlamayan öder.', author: 'Albert Einstein' },
+  { text: 'En iyi yatırım, kendinize yaptığınız yatırımdır.', author: 'Warren Buffett' },
+];
+
+export const randomQuote = () => QUOTES[Math.floor(Math.random() * QUOTES.length)];

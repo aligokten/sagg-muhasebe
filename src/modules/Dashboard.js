@@ -3,11 +3,12 @@ import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import {
   ArrowUpRight, ArrowDownRight, Download, Filter,
-  Wallet, FileText, AlertTriangle, TrendingDown, TrendingUp,
+  Wallet, FileText, AlertTriangle, TrendingDown, TrendingUp, Quote,
 } from 'lucide-react';
 import { formatCurrency, monthKey, monthLabel, toDate, formatDateShort, sum } from '../utils';
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
 import { downloadExcel } from '../exportExcel';
+import { randomQuote } from '../quotes';
 
 const initials = (name) =>
   (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase();
@@ -132,6 +133,8 @@ export default function Dashboard({ data, setPage }) {
     downloadExcel(`satis-ozeti-${today.replace(/\./g, '-')}`, blocks);
   };
 
+  const quote = useMemo(() => randomQuote(), []);
+
   const card = 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm';
   const heading = 'text-gray-800 dark:text-gray-100';
   const muted = 'text-gray-400 dark:text-gray-500';
@@ -149,6 +152,18 @@ export default function Dashboard({ data, setPage }) {
           <button onClick={handleExport} className={`flex items-center gap-1.5 px-4 py-2 rounded-full ${card} text-sm font-medium text-gray-600 dark:text-gray-200 hover:opacity-90`}><Download size={15} />Excel</button>
           <button onClick={() => setPage('invoices')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-orange-600 hover:bg-orange-700 shadow-sm"><FileText size={15} />Fatura Ekle</button>
         </div>
+      </div>
+
+      {/* Günün özdeyişi (her açılışta değişir) */}
+      <div className="relative mb-6 ml-1">
+        <div className="flex items-start gap-3 rounded-2xl rounded-tl-sm bg-orange-50 dark:bg-gray-800 border border-orange-100 dark:border-gray-700 px-4 py-3 max-w-3xl shadow-sm">
+          <Quote size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">
+            <span className="italic">“{quote.text}”</span>
+            <span className="font-semibold text-orange-600 dark:text-orange-400"> — {quote.author}</span>
+          </p>
+        </div>
+        <span className="absolute -top-1.5 left-4 w-3 h-3 rotate-45 bg-orange-50 dark:bg-gray-800 border-l border-t border-orange-100 dark:border-gray-700" />
       </div>
 
       {/* Uyarı şeridi */}
@@ -262,7 +277,6 @@ export default function Dashboard({ data, setPage }) {
                 <h3 className={`font-semibold ${heading}`}>İşlem Geçmişi</h3>
                 <p className={`text-xs ${muted}`}>Son hareketleriniz</p>
               </div>
-              <button onClick={() => setPage('invoices')} className="text-xs font-medium text-orange-600 hover:text-orange-700">Tümü</button>
             </div>
             {recent.length === 0 ? (
               <p className={`text-center text-sm py-10 ${muted}`}>Henüz hareket yok</p>
