@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
-  TrendingUp, Menu, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff,
+  TrendingUp, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff,
 } from 'lucide-react';
 
 import {
@@ -11,6 +11,7 @@ import {
 } from './firebase';
 import { Spinner } from './components/ui';
 import AuthModal from './components/AuthModal';
+import Topbar from './components/Topbar';
 import { COLLECTIONS } from './constants';
 
 import Dashboard from './modules/Dashboard';
@@ -155,6 +156,16 @@ export default function App() {
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem('sagg-theme') === 'dark' || localStorage.getItem('sagg-dash-dark') === '1'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    const el = document.documentElement;
+    if (dark) el.classList.add('dark'); else el.classList.remove('dark');
+    try { localStorage.setItem('sagg-theme', dark ? 'dark' : 'light'); } catch { /* yoksay */ }
+  }, [dark]);
+  const toggleDark = () => setDark((d) => !d);
 
   const [data, setData] = useState({ ...EMPTY_DATA, companyProfile: { companyName: '', address: '', bankAccounts: [] } });
 
@@ -262,7 +273,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
@@ -275,17 +286,18 @@ export default function App() {
         setMobileOpen={setMobileOpen}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="md:hidden flex items-center justify-between h-14 px-4 bg-white border-b no-print">
-          <button onClick={() => setMobileOpen(true)} className="text-gray-600"><Menu /></button>
-          {data.companyProfile?.logo ? (
-            <img src={data.companyProfile.logo} alt="Logo" className="h-8 max-w-[140px] object-contain" />
-          ) : (
-            <span className="font-bold text-gray-800">SAGG Defter</span>
-          )}
-          {isAnonymous ? (
-            <button onClick={() => setAuthOpen(true)} className="text-orange-600"><LogIn size={20} /></button>
-          ) : <span className="w-6" />}
-        </header>
+        <Topbar
+          data={data}
+          setPage={setCurrentPage}
+          onOpenMobile={() => setMobileOpen(true)}
+          userEmail={userEmail}
+          isAnonymous={isAnonymous}
+          onAuth={() => setAuthOpen(true)}
+          onLogout={handleLogout}
+          dark={dark}
+          toggleDark={toggleDark}
+          logo={data.companyProfile?.logo}
+        />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
       </div>
       {authOpen && <AuthModal isAnonymous={isAnonymous} onClose={() => setAuthOpen(false)} />}
