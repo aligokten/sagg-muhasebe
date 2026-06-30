@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput, toInputDate } from '../utils';
-import { downloadExcel, tl } from '../exportExcel';
+import { downloadExcel } from '../exportExcel';
 import { cariMovements, allCariBalances, customerProjectBalances, subcontractPaid, subcontractRemaining } from '../finance';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
@@ -23,26 +23,28 @@ const balanceBadge = (bal) => {
 const balanceText = (bal) =>
   bal >= 0 ? `${formatCurrency(bal)} Borç` : `${formatCurrency(-bal)} Alacak`;
 
-// Cari/iş ekstresini Excel (.xls) hesap dökümü olarak indirir.
+// Cari/iş ekstresini Excel hesap dökümü olarak indirir (tutarlar gerçek sayı).
 function exportLedgerExcel(heading, customer, rows, balance, showProject, filename) {
+  const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
   const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
   const totalAlacak = rows.reduce((s, r) => s + r.alacak, 0);
-  const headers = ['Tarih', 'İşlem', 'Açıklama', ...(showProject ? ['İş/Proje'] : []), 'Borç', 'Alacak', 'Bakiye'];
+  const headers = ['Tarih', 'İşlem', 'Açıklama', ...(showProject ? ['İş/Proje'] : []), 'Borç', 'Alacak', 'Bakiye', 'Durum'];
   const dataRows = rows.map((r) => [
     formatDateShort(r.date), r.type,
     r.description + (r.category ? ` (${r.category})` : ''),
     ...(showProject ? [r.projectName || 'Genel'] : []),
-    r.borc ? tl(r.borc) : '', r.alacak ? tl(r.alacak) : '',
-    `${tl(Math.abs(r.balance))} ${r.balance >= 0 ? '(B)' : '(A)'}`,
+    r.borc ? round(r.borc) : '', r.alacak ? round(r.alacak) : '',
+    round(Math.abs(r.balance)), r.balance >= 0 ? 'Borç' : 'Alacak',
   ]);
-  const totalRow = ['', 'TOPLAM', '', ...(showProject ? [''] : []), tl(totalBorc), tl(totalAlacak), `${tl(Math.abs(balance))} ${balance >= 0 ? 'B' : 'A'}`];
+  const totalRow = ['', 'TOPLAM', '', ...(showProject ? [''] : []), round(totalBorc), round(totalAlacak), round(Math.abs(balance)), balance >= 0 ? 'Borç' : 'Alacak'];
   downloadExcel(filename, [
     { heading },
     { rows: [
       ['Tarih', new Date().toLocaleDateString('tr-TR')],
       ['Cari', customer.name],
       ['Vergi/TCKN', customer.taxId || customer.tcNo || '-'],
-      ['Genel Bakiye', `${tl(Math.abs(balance))} ${balance >= 0 ? 'Borç' : 'Alacak'}`],
+      ['Genel Bakiye', round(Math.abs(balance))],
+      ['Durum', balance >= 0 ? 'Borç (bizden alacaklı)' : 'Alacak (bize borçlu)'],
     ] },
     { headers, rows: [...dataRows, totalRow] },
   ]);
