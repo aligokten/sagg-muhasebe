@@ -1,8 +1,9 @@
 // --- Cari Hesaplar (müşteri / tedarikçi) + işler/projeler + ekstre + tahsilat/ödeme ---
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Edit, Trash2, Wallet, HandCoins, Printer, Users, Briefcase, PlusCircle, DraftingCompass, Banknote } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput, toInputDate } from '../utils';
+import { downloadExcel, tl } from '../exportExcel';
 import { cariMovements, allCariBalances, customerProjectBalances, subcontractPaid, subcontractRemaining } from '../finance';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
@@ -21,6 +22,31 @@ const balanceBadge = (bal) => {
 
 const balanceText = (bal) =>
   bal >= 0 ? `${formatCurrency(bal)} Borç` : `${formatCurrency(-bal)} Alacak`;
+
+// Cari/iş ekstresini Excel (.xls) hesap dökümü olarak indirir.
+function exportLedgerExcel(heading, customer, rows, balance, showProject, filename) {
+  const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
+  const totalAlacak = rows.reduce((s, r) => s + r.alacak, 0);
+  const headers = ['Tarih', 'İşlem', 'Açıklama', ...(showProject ? ['İş/Proje'] : []), 'Borç', 'Alacak', 'Bakiye'];
+  const dataRows = rows.map((r) => [
+    formatDateShort(r.date), r.type,
+    r.description + (r.category ? ` (${r.category})` : ''),
+    ...(showProject ? [r.projectName || 'Genel'] : []),
+    r.borc ? tl(r.borc) : '', r.alacak ? tl(r.alacak) : '',
+    `${tl(Math.abs(r.balance))} ${r.balance >= 0 ? '(B)' : '(A)'}`,
+  ]);
+  const totalRow = ['', 'TOPLAM', '', ...(showProject ? [''] : []), tl(totalBorc), tl(totalAlacak), `${tl(Math.abs(balance))} ${balance >= 0 ? 'B' : 'A'}`];
+  downloadExcel(filename, [
+    { heading },
+    { rows: [
+      ['Tarih', new Date().toLocaleDateString('tr-TR')],
+      ['Cari', customer.name],
+      ['Vergi/TCKN', customer.taxId || customer.tcNo || '-'],
+      ['Genel Bakiye', `${tl(Math.abs(balance))} ${balance >= 0 ? 'Borç' : 'Alacak'}`],
+    ] },
+    { headers, rows: [...dataRows, totalRow] },
+  ]);
+}
 
 // --- Cari ekleme/düzenleme formu ---
 function CustomerForm({ existing, userId, onClose }) {
@@ -351,7 +377,10 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
           <p className="text-sm text-gray-500 mt-1">{customer.name}{project.address ? ` · ${project.address}` : ''}</p>
           {project.description && <p className="text-sm text-gray-500 mt-1">{project.description}</p>}
         </div>
-        <Button icon={Edit} variant="secondary" onClick={() => setEditOpen(true)}>İşi Düzenle</Button>
+        <div className="flex gap-2 items-start flex-wrap">
+          <Button icon={Download} variant="secondary" onClick={() => exportLedgerExcel(`${project.name} — İŞ EKSTRESİ`, customer, rows, balance, false, `${customer.name}-${project.name}-ekstre`)}>Excel'e Aktar</Button>
+          <Button icon={Edit} variant="secondary" onClick={() => setEditOpen(true)}>İşi Düzenle</Button>
+        </div>
       </div>
 
       {/* Hızlı kayıt çubuğu (işe işlenir) */}
@@ -426,6 +455,8 @@ function CustomerDetail({ customer, data, userId, onBack }) {
   const projectBalances = useMemo(() => customerProjectBalances(customer.id, data), [customer.id, data]);
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data), [customer, data]);
 
+  const exportEkstre = () => exportLedgerExcel(`${customer.name} — HESAP EKSTRESİ`, customer, rows, balance, customerProjects.length > 0, customer.name + '-ekstre');
+
   if (selectedProject) {
     const fresh = customerProjects.find((p) => p.id === selectedProject.id);
     if (fresh) return <ProjectLedger customer={customer} project={fresh} data={data} userId={userId} onBack={() => setSelectedProject(null)} />;
@@ -447,7 +478,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         <div className="flex gap-2 items-start flex-wrap">
           <Button icon={Wallet} variant="success" onClick={() => setPayment('tahsilat')}>Tahsilat</Button>
           <Button icon={HandCoins} variant="danger" onClick={() => setPayment('odeme')}>Ödeme</Button>
-          <Button icon={Printer} variant="secondary" onClick={() => window.print()}>Yazdır</Button>
+          <Button icon={Download} variant="secondary" onClick={exportEkstre}>Excel'e Aktar</Button>
         </div>
       </div>
 
