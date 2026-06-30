@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, monthKey, monthLabel, toDate, sum } from '../utils';
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
-import { downloadExcel, tl } from '../exportExcel';
+import { downloadExcel } from '../exportExcel';
 
 const initials = (name) =>
   (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase();
@@ -138,37 +138,38 @@ export default function Dashboard({ data, setPage }) {
   const periodLabel = { today: 'Bugün', week: 'Bu Hafta', month: 'Bu Ay' }[period];
 
   const handleExport = () => {
+    const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
     const today = new Date().toLocaleDateString('tr-TR');
     const blocks = [
       { heading: `SATIŞ ÖZETİ — ${today}` },
       {
-        headers: ['Özet', 'Tutar'],
+        headers: ['Özet', 'Tutar (TL)'],
         rows: [
-          ['Toplam Gelir', tl(totalIncome)],
-          ['Toplam Gider', tl(totalExpense)],
-          ['Net (Kâr/Zarar)', tl(totalIncome - totalExpense)],
-          ['Kasa/Banka Bakiye', tl(cashTotal)],
-          ['Toplam Alacak', tl(receivable)],
-          ['Tahsilat Oranı', `%${collectionRate.toFixed(0)}`],
+          ['Toplam Gelir', round(totalIncome)],
+          ['Toplam Gider', round(totalExpense)],
+          ['Net (Kâr/Zarar)', round(totalIncome - totalExpense)],
+          ['Kasa/Banka Bakiye', round(cashTotal)],
+          ['Toplam Alacak', round(receivable)],
+          ['Tahsilat Oranı (%)', Math.round(collectionRate)],
         ],
       },
       {
         heading: 'Kasa / Banka Bakiyeleri',
-        headers: ['Hesap', 'Bakiye'],
-        rows: accounts.map((a) => [a.name, tl(accBalances[a.id] || 0)]),
+        headers: ['Hesap', 'Bakiye (TL)'],
+        rows: accounts.map((a) => [a.name, round(accBalances[a.id] || 0)]),
       },
       {
         heading: 'Cari Bakiyeleri',
-        headers: ['Cari', 'Bakiye', 'Durum'],
+        headers: ['Cari', 'Bakiye (TL)', 'Durum'],
         rows: customers.map((c) => {
           const b = cariBalances[c.id] || 0;
-          return [c.name, tl(Math.abs(b)), Math.abs(b) < 0.01 ? '-' : b > 0 ? 'Borç (bize)' : 'Alacak (bizden)'];
+          return [c.name, round(b), Math.abs(b) < 0.01 ? '-' : b > 0 ? 'Borç (bize)' : 'Alacak (bizden)'];
         }),
       },
       {
         heading: 'Aylık Gelir (Son 7 Ay)',
-        headers: ['Ay', 'Gelir'],
-        rows: chart.map((c) => [c.ay, tl(c.tutar)]),
+        headers: ['Ay', 'Gelir (TL)'],
+        rows: chart.map((c) => [c.ay, round(c.tutar)]),
       },
     ];
     downloadExcel(`satis-ozeti-${today.replace(/\./g, '-')}`, blocks);

@@ -1,35 +1,52 @@
-// --- Excel (.xls) dışa aktarma yardımcıları ---
-// Bağımlılıksız: HTML tablo, Excel'in açabildiği .xls olarak indirilir.
+// --- Excel dışa aktarma (Excel 2003 SpreadsheetML) ---
+// Bağımlılıksız. Sayılar gerçek sayı tipiyle yazılır (toplanabilir, locale-bağımsız);
+// metinler UTF-8 ile düzgün görünür.
 import { formatNumber } from './utils';
 
 const esc = (s) =>
   String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
-// Tutarı Türkçe biçimde metin olarak verir (Excel'de düzgün görünür).
+// Geriye dönük uyumluluk için (artık ham sayı geçilmesi tercih edilir).
 export const tl = (n) => formatNumber(n, 2);
 
-// blocks: [{ heading?, headers?: [], rows?: [[...]], }]
-export function buildExcel(blocks) {
-  let body = '';
+const cell = (v) => {
+  if (typeof v === 'number' && isFinite(v)) {
+    return `<Cell ss:StyleID="num"><Data ss:Type="Number">${v}</Data></Cell>`;
+  }
+  const s = String(v ?? '');
+  if (s === '') return '<Cell/>';
+  return `<Cell><Data ss:Type="String">${esc(s)}</Data></Cell>`;
+};
+
+const headerCell = (v) => `<Cell ss:StyleID="hdr"><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+
+// blocks: [{ heading?, headers?: string[], rows?: (string|number)[][] }]
+export function buildSpreadsheetML(blocks) {
+  let rows = '';
   blocks.forEach((b) => {
-    if (b.heading) body += `<tr><td colspan="8" style="font-weight:bold;font-size:13px;">${esc(b.heading)}</td></tr>`;
-    if (b.headers) {
-      body += '<tr>' + b.headers.map((h) => `<td style="font-weight:bold;background:#e8eef5;border:1px solid #c9d3df;">${esc(h)}</td>`).join('') + '</tr>';
-    }
-    (b.rows || []).forEach((r) => {
-      body += '<tr>' + r.map((c) => `<td style="border:1px solid #dfe5ec;">${esc(c)}</td>`).join('') + '</tr>';
-    });
-    body += '<tr><td>&nbsp;</td></tr>';
+    if (b.heading) rows += `<Row><Cell ss:StyleID="title"><Data ss:Type="String">${esc(b.heading)}</Data></Cell></Row>`;
+    if (b.headers) rows += '<Row>' + b.headers.map(headerCell).join('') + '</Row>';
+    (b.rows || []).forEach((r) => { rows += '<Row>' + r.map(cell).join('') + '</Row>'; });
+    rows += '<Row></Row>';
   });
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sayfa1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:12px;">${body}</table></body></html>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>` +
+    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
+    `<Styles>` +
+    `<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Bottom"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>` +
+    `<Style ss:ID="title"><Font ss:Bold="1" ss:Size="13"/></Style>` +
+    `<Style ss:ID="hdr"><Font ss:Bold="1"/><Interior ss:Color="#E8EEF5" ss:Pattern="Solid"/></Style>` +
+    `<Style ss:ID="num"><NumberFormat ss:Format="#,##0.00"/></Style>` +
+    `</Styles>` +
+    `<Worksheet ss:Name="Sayfa1"><Table>${rows}</Table></Worksheet></Workbook>`;
 }
 
 export function downloadExcel(filename, blocks) {
-  const html = buildExcel(blocks);
-  const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const xml = buildSpreadsheetML(blocks);
+  const blob = new Blob(['﻿' + xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const safe = filename.replace(/[\\/:*?"<>|]+/g, '_');
   const a = document.createElement('a');
