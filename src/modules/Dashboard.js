@@ -169,92 +169,64 @@ export default function Dashboard({ data, setPage }) {
         </div>
       )}
 
-      {/* 1. SATIR: Özet + Hareketler */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        {/* Özet */}
-        <div className={`rounded-3xl p-5 ${card}`}>
-          <div className="flex justify-between items-center mb-1">
-            <div>
-              <h3 className={`font-semibold ${heading}`}>Özet</h3>
-              <p className={`text-xs ${muted}`}>Performansınızı takip edin</p>
-            </div>
-            <select value={period} onChange={(e) => setPeriod(e.target.value)} className="text-xs font-medium rounded-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 px-3 py-1.5 outline-none">
-              <option value="today">Bugün</option>
-              <option value="week">Haftalık</option>
-              <option value="month">Aylık</option>
-            </select>
-          </div>
-          <div className="rounded-2xl bg-gray-50 dark:bg-gray-900/40 p-4 mt-3">
-            <div className="flex gap-6 mb-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><TrendingDown size={13} /></span>Toplam Gelir</div>
-                <p className={`text-2xl font-bold mt-1 ${heading}`}>{formatCurrency(periodIncome)}</p>
+      {/* Ana yerleşim: sol (Özet + ortalamalar) | sağ (Hareketler + İşlem Geçmişi) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        {/* SOL SÜTUN */}
+        <div className="lg:col-span-2 flex flex-col gap-5">
+          {/* Özet */}
+          <div className={`rounded-3xl p-5 ${card}`}>
+            <div className="flex justify-between items-center mb-1">
+              <div>
+                <h3 className={`font-semibold ${heading}`}>Özet</h3>
+                <p className={`text-xs ${muted}`}>Performansınızı takip edin</p>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center"><TrendingUp size={13} /></span>Toplam Gider</div>
-                <p className={`text-2xl font-bold mt-1 ${heading}`}>{formatCurrency(periodExpense)}</p>
+              <select value={period} onChange={(e) => setPeriod(e.target.value)} className="text-xs font-medium rounded-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 px-3 py-1.5 outline-none">
+                <option value="today">Bugün</option>
+                <option value="week">Haftalık</option>
+                <option value="month">Aylık</option>
+              </select>
+            </div>
+            <div className="rounded-2xl bg-gray-50 dark:bg-gray-900/40 p-4 mt-3">
+              <div className="flex gap-6 mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><TrendingDown size={13} /></span>Toplam Gelir</div>
+                  <p className={`text-2xl font-bold mt-1 ${heading}`}>{formatCurrency(periodIncome)}</p>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center"><TrendingUp size={13} /></span>Toplam Gider</div>
+                  <p className={`text-2xl font-bold mt-1 ${heading}`}>{formatCurrency(periodExpense)}</p>
+                </div>
               </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={chart} margin={{ top: 6, right: 0, left: 0, bottom: 0 }} barCategoryGap="24%">
+                  <XAxis dataKey="ay" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                  <Tooltip cursor={{ fill: 'transparent' }} formatter={(v) => formatCurrency(v)} contentStyle={{ borderRadius: 12, border: '1px solid #eee', fontSize: 12 }} />
+                  <Bar dataKey="tutar" radius={[8, 8, 8, 8]} maxBarSize={24}>
+                    {chart.map((c, i) => <Cell key={i} fill={i < Math.ceil(chart.length * 0.6) ? '#ea580c' : '#fcd9b6'} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <ResponsiveContainer width="100%" height={170}>
-              <BarChart data={chart} margin={{ top: 6, right: 0, left: 0, bottom: 0 }} barCategoryGap="26%">
-                <XAxis dataKey="ay" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
-                <Tooltip cursor={{ fill: 'transparent' }} formatter={(v) => formatCurrency(v)} contentStyle={{ borderRadius: 12, border: '1px solid #eee', fontSize: 12 }} />
-                <Bar dataKey="tutar" radius={[8, 8, 8, 8]} maxBarSize={26}>
-                  {chart.map((c, i) => <Cell key={i} fill={i >= chart.length - 3 ? '#ea580c' : '#fcd9b6'} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
           </div>
-        </div>
 
-        {/* Hareketler */}
-        <div>
-          <div className="mb-3">
-            <h3 className={`font-semibold ${heading}`}>Hareketler</h3>
-            <p className={`text-xs ${muted}`}>Akışınızı takip edin</p>
+          {/* Ortalama kartları */}
+          <div className="grid grid-cols-2 gap-5">
+            {[
+              { label: 'Aylık Ort. Gelir', value: avgIncome, icon: TrendingUp, c: 'text-emerald-600 bg-emerald-50', ch: incomeChange },
+              { label: 'Aylık Ort. Gider', value: avgExpense, icon: TrendingDown, c: 'text-orange-600 bg-orange-50', ch: expenseChange },
+              { label: 'Kasa / Banka', value: cashTotal, icon: Wallet, c: 'text-violet-600 bg-violet-50' },
+              { label: 'Toplam Alacak', value: receivable, icon: ArrowUpRight, c: 'text-rose-600 bg-rose-50' },
+            ].map((s, i) => (
+              <div key={i} className={`rounded-3xl p-5 ${card}`}>
+                <div className="flex items-center gap-2 text-xs text-gray-500"><span className={`w-7 h-7 rounded-lg flex items-center justify-center ${s.c}`}><s.icon size={15} /></span>{s.label}</div>
+                {s.ch !== undefined && <div className="mt-2"><ChangeBadge value={s.ch} /></div>}
+                <p className={`text-lg font-bold mt-2 ${heading}`}>{formatCurrency(s.value)}</p>
+              </div>
+            ))}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Tahsilat */}
-            <div className={`rounded-3xl p-4 ${card}`}>
-              <p className={`text-sm font-medium ${heading}`}>Tahsilat</p>
-              <div className="mt-2"><ChangeBadge value={tahsilatChange} /></div>
-              <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(tahsilatTotal)}</p>
-              <div className="mt-2"><Spark data={tahsilatSeries} color="#ea580c" id="t" /></div>
-            </div>
-            {/* Gelir */}
-            <div className={`rounded-3xl p-4 ${card}`}>
-              <p className={`text-sm font-medium ${heading}`}>Gelir</p>
-              <div className="mt-2"><ChangeBadge value={incomeChange} /></div>
-              <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(totalIncome)}</p>
-              <div className="mt-2"><Spark data={gelirSeries} color="#f59e0b" id="g" /></div>
-            </div>
-            {/* Gider (koyu) */}
-            <div className="rounded-3xl p-4 bg-gradient-to-br from-[#3a2415] to-[#5a3010] text-white shadow-md">
-              <p className="text-sm font-medium">Gider</p>
-              <div className="mt-2"><ChangeBadge value={expenseChange} light /></div>
-              <p className="text-xl font-bold mt-2">{formatCurrency(totalExpense)}</p>
-              <div className="mt-2"><Spark data={giderSeries} color="#fb923c" id="e" /></div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* 2. SATIR: Ortalamalar + İşlem geçmişi */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="grid grid-cols-2 gap-5 content-start">
-          {[
-            { label: 'Aylık Ort. Gelir', value: avgIncome, icon: TrendingUp, c: 'text-emerald-600 bg-emerald-50', ch: incomeChange },
-            { label: 'Aylık Ort. Gider', value: avgExpense, icon: TrendingDown, c: 'text-orange-600 bg-orange-50', ch: expenseChange },
-            { label: 'Kasa / Banka', value: cashTotal, icon: Wallet, c: 'text-violet-600 bg-violet-50' },
-            { label: 'Toplam Alacak', value: receivable, icon: ArrowUpRight, c: 'text-rose-600 bg-rose-50' },
-          ].map((s, i) => (
-            <div key={i} className={`rounded-3xl p-5 ${card}`}>
-              <div className="flex items-center gap-2 text-xs text-gray-500"><span className={`w-7 h-7 rounded-lg flex items-center justify-center ${s.c}`}><s.icon size={15} /></span>{s.label}</div>
-              {s.ch !== undefined && <div className="mt-2"><ChangeBadge value={s.ch} /></div>}
-              <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(s.value)}</p>
-            </div>
-          ))}
-          <div className="col-span-2 rounded-3xl p-5 bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md flex items-center justify-between">
+          {/* Net Durum */}
+          <div className="rounded-3xl p-5 bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md flex items-center justify-between">
             <div>
               <p className="font-semibold">Net Durum</p>
               <p className="text-xs text-white/70 mt-0.5">Gelir − Gider</p>
@@ -263,32 +235,63 @@ export default function Dashboard({ data, setPage }) {
           </div>
         </div>
 
-        {/* İşlem Geçmişi */}
-        <div className={`rounded-3xl p-5 ${card}`}>
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className={`font-semibold ${heading}`}>İşlem Geçmişi</h3>
-              <p className={`text-xs ${muted}`}>Son hareketleriniz</p>
+        {/* SAĞ SÜTUN */}
+        <div className="lg:col-span-3 flex flex-col gap-5">
+          {/* Hareketler */}
+          <div>
+            <div className="mb-3">
+              <h3 className={`font-semibold ${heading}`}>Hareketler</h3>
+              <p className={`text-xs ${muted}`}>Akışınızı takip edin</p>
             </div>
-            <button onClick={() => setPage('invoices')} className="text-xs font-medium text-orange-600 hover:text-orange-700">Tümü</button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`rounded-3xl p-4 ${card}`}>
+                <p className={`text-sm font-medium ${heading}`}>Tahsilat</p>
+                <div className="mt-2"><ChangeBadge value={tahsilatChange} /></div>
+                <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(tahsilatTotal)}</p>
+                <div className="mt-2"><Spark data={tahsilatSeries} color="#ea580c" id="t" /></div>
+              </div>
+              <div className={`rounded-3xl p-4 ${card}`}>
+                <p className={`text-sm font-medium ${heading}`}>Gelir</p>
+                <div className="mt-2"><ChangeBadge value={incomeChange} /></div>
+                <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(totalIncome)}</p>
+                <div className="mt-2"><Spark data={gelirSeries} color="#f59e0b" id="g" /></div>
+              </div>
+              <div className="rounded-3xl p-4 bg-gradient-to-br from-[#3a2415] to-[#5a3010] text-white shadow-md">
+                <p className="text-sm font-medium">Gider</p>
+                <div className="mt-2"><ChangeBadge value={expenseChange} light /></div>
+                <p className="text-xl font-bold mt-2">{formatCurrency(totalExpense)}</p>
+                <div className="mt-2"><Spark data={giderSeries} color="#fb923c" id="e" /></div>
+              </div>
+            </div>
           </div>
-          {recent.length === 0 ? (
-            <p className={`text-center text-sm py-10 ${muted}`}>Henüz hareket yok</p>
-          ) : (
-            <div className="divide-y divide-gray-100 dark:divide-gray-700">
-              {recent.map((r, i) => (
-                <div key={i} className="flex items-center gap-3 py-2.5">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>{initials(r.name)}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${heading}`}>{r.name || '—'}</p>
-                    <p className={`text-xs truncate ${muted}`}>{r.doc} · {formatDateShort(r.date)}</p>
-                  </div>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${r.tag === 'Tahsilat' ? 'bg-emerald-100 text-emerald-700' : r.tag === 'Alış' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>{r.tag}</span>
-                  <p className={`text-sm font-semibold w-24 text-right ${r.neg ? 'text-rose-600' : 'text-gray-800 dark:text-gray-100'}`}>{r.neg ? '-' : ''}{formatCurrency(r.amount)}</p>
-                </div>
-              ))}
+
+          {/* İşlem Geçmişi */}
+          <div className={`rounded-3xl p-5 flex-1 ${card}`}>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className={`font-semibold ${heading}`}>İşlem Geçmişi</h3>
+                <p className={`text-xs ${muted}`}>Son hareketleriniz</p>
+              </div>
+              <button onClick={() => setPage('invoices')} className="text-xs font-medium text-orange-600 hover:text-orange-700">Tümü</button>
             </div>
-          )}
+            {recent.length === 0 ? (
+              <p className={`text-center text-sm py-10 ${muted}`}>Henüz hareket yok</p>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {recent.map((r, i) => (
+                  <div key={i} className="flex items-center gap-3 py-2.5">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>{initials(r.name)}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${heading}`}>{r.name || '—'}</p>
+                      <p className={`text-xs truncate ${muted}`}>{r.doc} · {formatDateShort(r.date)}</p>
+                    </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${r.tag === 'Tahsilat' ? 'bg-emerald-100 text-emerald-700' : r.tag === 'Alış' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>{r.tag}</span>
+                    <p className={`text-sm font-semibold w-24 text-right ${r.neg ? 'text-rose-600' : 'text-gray-800 dark:text-gray-100'}`}>{r.neg ? '-' : ''}{formatCurrency(r.amount)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
