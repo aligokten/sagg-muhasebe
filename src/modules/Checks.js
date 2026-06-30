@@ -15,20 +15,22 @@ const statusMeta = {
   returned: { label: 'Karşılıksız', color: 'red' },
 };
 
-function CheckForm({ existing, userId, customers, onClose }) {
+function CheckForm({ existing, userId, customers, projects, onClose }) {
   const [form, setForm] = useState(
     existing || {
-      type: 'cek', direction: 'received', customerId: '', amount: '',
+      type: 'cek', direction: 'received', customerId: '', projectId: '', amount: '',
       serialNo: '', bank: '', date: todayInput(), dueDate: todayInput(), status: 'portfolio',
     }
   );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const customerProjects = projects.filter((p) => p.customerId === form.customerId);
   const submit = async (e) => {
     e.preventDefault();
     if (!(Number(form.amount) > 0)) return alert('Tutar girin.');
     const customer = customers.find((c) => c.id === form.customerId);
     const payload = {
       ...form, amount: Number(form.amount), customerName: customer?.name || '',
+      projectId: form.projectId || null,
       date: Timestamp.fromDate(new Date(form.date)),
       dueDate: Timestamp.fromDate(new Date(form.dueDate)),
     };
@@ -42,7 +44,10 @@ function CheckForm({ existing, userId, customers, onClose }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Tür"><Select name="type" value={form.type} onChange={set}><option value="cek">Çek</option><option value="senet">Senet</option></Select></Field>
         <Field label="Yön"><Select name="direction" value={form.direction} onChange={set}><option value="received">Alınan (müşteri çeki)</option><option value="issued">Verilen (kendi çekimiz)</option></Select></Field>
-        <Field label="Cari Hesap" className="md:col-span-2"><Select name="customerId" value={form.customerId} onChange={set}><option value="">Seçiniz...</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label="Cari Hesap" className="md:col-span-2"><Select name="customerId" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, projectId: '' })}><option value="">Seçiniz...</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        {customerProjects.length > 0 && (
+          <Field label="İş / Proje" className="md:col-span-2"><Select name="projectId" value={form.projectId || ''} onChange={set}><option value="">Genel (işe bağlı değil)</option>{customerProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+        )}
         <Field label="Tutar"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
         <Field label="Seri No"><Input name="serialNo" value={form.serialNo} onChange={set} /></Field>
         <Field label="Banka"><Input name="bank" value={form.bank} onChange={set} /></Field>
@@ -55,7 +60,7 @@ function CheckForm({ existing, userId, customers, onClose }) {
 }
 
 export default function Checks({ data, userId }) {
-  const { checks = [], customers = [] } = data;
+  const { checks = [], customers = [], projects = [] } = data;
   const [tab, setTab] = useState('received');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -116,7 +121,7 @@ export default function Checks({ data, userId }) {
         )}
       </Card>
 
-      {formOpen && <CheckForm existing={editing} userId={userId} customers={customers} onClose={() => { setFormOpen(false); setEditing(null); }} />}
+      {formOpen && <CheckForm existing={editing} userId={userId} customers={customers} projects={projects} onClose={() => { setFormOpen(false); setEditing(null); }} />}
       {confirmId && <ConfirmDialog message="Bu kaydı silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'checks', confirmId)} onClose={() => setConfirmId(null)} />}
     </div>
   );

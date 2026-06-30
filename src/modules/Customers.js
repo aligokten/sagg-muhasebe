@@ -2,11 +2,11 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Edit, Trash2, Wallet, HandCoins, Printer, Users, Briefcase, PlusCircle, DraftingCompass, Banknote } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
-import { formatCurrency, formatDateShort, todayInput } from '../utils';
+import { formatCurrency, formatDateShort, todayInput, toInputDate } from '../utils';
 import { cariMovements, allCariBalances, customerProjectBalances, subcontractPaid, subcontractRemaining } from '../finance';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
-  FormModal, ConfirmDialog, Button, Field, Input, Select, Textarea,
+  FormModal, ConfirmDialog, Button, Field, Input, Select, Textarea, ActionMenu,
 } from '../components/ui';
 import QuickEntry from '../components/QuickEntry';
 import { BRANCHES } from './Authors';
@@ -216,12 +216,73 @@ function AuthorPaymentForm({ subcontract, userId, accounts, onClose }) {
   );
 }
 
+// --- Hareket (tahsilat/ödeme/manuel) düzenleme formu ---
+function TransactionForm({ customer, existing, userId, accounts, projects, onClose }) {
+  const initialAction = existing.type === 'tahsilat' ? 'tahsilat'
+    : existing.type === 'odeme' ? 'odeme'
+    : existing.cariEffect === 'borc' ? 'satis' : 'alis';
+  const [form, setForm] = useState({
+    action: initialAction,
+    amount: existing.amount ?? '',
+    category: existing.category || '',
+    description: existing.description || '',
+    date: toInputDate(existing.date),
+    accountId: existing.accountId || '',
+    projectId: existing.projectId || '',
+  });
+  const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const needsAccount = form.action === 'tahsilat' || form.action === 'odeme';
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!(Number(form.amount) > 0)) return alert('Tutar girin.');
+    const labels = { tahsilat: 'Tahsilat', odeme: 'Ödeme', satis: 'Satış', alis: 'Alış' };
+    const base = {
+      customerId: customer.id, customerName: customer.name,
+      projectId: form.projectId || null,
+      amount: Number(form.amount),
+      category: form.category || null,
+      description: form.description || form.category || labels[form.action],
+      date: Timestamp.fromDate(new Date(form.date)),
+    };
+    let payload;
+    if (form.action === 'tahsilat') payload = { ...base, type: 'tahsilat', direction: 'in', cariEffect: null, accountId: form.accountId || null };
+    else if (form.action === 'odeme') payload = { ...base, type: 'odeme', direction: 'out', cariEffect: null, accountId: form.accountId || null };
+    else if (form.action === 'satis') payload = { ...base, type: 'manuel', cariEffect: 'borc', direction: null, accountId: null };
+    else payload = { ...base, type: 'manuel', cariEffect: 'alacak', direction: null, accountId: null };
+    try {
+      await updateRecord(userId, 'transactions', existing.id, payload);
+      onClose();
+    } catch (err) { console.error(err); alert('Güncellenemedi.'); }
+  };
+  return (
+    <FormModal title="Hareket Düzenle" onSubmit={submit} onClose={onClose}>
+      <div className="flex flex-wrap gap-1 mb-3">
+        {[['tahsilat', 'Tahsilat'], ['odeme', 'Ödeme'], ['satis', 'Satış (Borç)'], ['alis', 'Alış (Alacak)']].map(([k, l]) => (
+          <button type="button" key={k} onClick={() => setForm((f) => ({ ...f, action: k }))} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${form.action === k ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-4">
+        {projects.length > 0 && (
+          <Field label="İş / Proje"><Select name="projectId" value={form.projectId} onChange={set}><option value="">Genel</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+        )}
+        <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={set} required /></Field>
+        <Field label="Tutar"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
+        <Field label="Kategori"><CategorySelect name="category" value={form.category} onChange={set} /></Field>
+        {needsAccount && <Field label="Kasa / Banka"><Select name="accountId" value={form.accountId} onChange={set}><option value="">Belirtilmedi</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
+        <Field label="Açıklama"><Input name="description" value={form.description} onChange={set} /></Field>
+      </div>
+    </FormModal>
+  );
+}
+
 // --- Ekstre tablosu (cari ya da proje) ---
-function LedgerTable({ rows, showProject }) {
+function LedgerTable({ rows, showProject, onEditTx, onDeleteTx }) {
+  const actions = !!(onEditTx || onDeleteTx);
   const headers = [
     { label: 'Tarih' }, { label: 'İşlem' }, { label: 'Açıklama' },
     ...(showProject ? [{ label: 'İş/Proje' }] : []),
     { label: 'Borç', align: 'right' }, { label: 'Alacak', align: 'right' }, { label: 'Bakiye', align: 'right' },
+    ...(actions ? [{ label: '' }] : []),
   ];
   return (
     <Table headers={headers}>
@@ -237,6 +298,18 @@ function LedgerTable({ rows, showProject }) {
           <Td align="right" className="text-red-600">{r.borc ? formatCurrency(r.borc) : '-'}</Td>
           <Td align="right" className="text-green-600">{r.alacak ? formatCurrency(r.alacak) : '-'}</Td>
           <Td align="right" className="font-semibold text-gray-800">{formatCurrency(Math.abs(r.balance))} {r.balance >= 0 ? '(B)' : '(A)'}</Td>
+          {actions && (
+            <Td align="right">
+              {r.ref?.kind === 'transaction' ? (
+                <ActionMenu
+                  items={[
+                    { label: 'Düzenle', icon: Edit, onClick: () => onEditTx(r.ref.id) },
+                    { label: 'Sil', icon: Trash2, danger: true, onClick: () => onDeleteTx(r.ref.id) },
+                  ]}
+                />
+              ) : null}
+            </Td>
+          )}
         </tr>
       ))}
     </Table>
@@ -250,6 +323,10 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
   const [subOpen, setSubOpen] = useState(false);
   const [payFor, setPayFor] = useState(null);
   const [confirmSubId, setConfirmSubId] = useState(null);
+  const [editTx, setEditTx] = useState(null);
+  const [confirmTxId, setConfirmTxId] = useState(null);
+  const customerProjects = (data.projects || []).filter((p) => p.customerId === customer.id);
+  const txById = (id) => (data.transactions || []).find((t) => t.id === id);
 
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data, project.id), [customer, project, data]);
   const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
@@ -319,13 +396,17 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
       </Card>
 
       <Card title="Müşteri Hesap Ekstresi (bu iş)">
-        {rows.length === 0 ? <EmptyState message="Bu iş için henüz hareket yok" /> : <LedgerTable rows={rows} showProject={false} />}
+        {rows.length === 0 ? <EmptyState message="Bu iş için henüz hareket yok" /> : (
+          <LedgerTable rows={rows} showProject={false} onEditTx={(id) => setEditTx(txById(id))} onDeleteTx={(id) => setConfirmTxId(id)} />
+        )}
       </Card>
 
       {editOpen && <ProjectForm customerId={customer.id} existing={project} userId={userId} onClose={() => setEditOpen(false)} />}
       {subOpen && <SubcontractForm project={project} authors={authors} userId={userId} onClose={() => setSubOpen(false)} />}
       {payFor && <AuthorPaymentForm subcontract={payFor} userId={userId} accounts={accounts} onClose={() => setPayFor(null)} />}
       {confirmSubId && <ConfirmDialog message="Bu müellif atamasını silmek istediğinize emin misiniz? (Yapılan ödemeler silinmez.)" onConfirm={() => deleteRecord(userId, 'subcontracts', confirmSubId)} onClose={() => setConfirmSubId(null)} />}
+      {editTx && <TransactionForm customer={customer} existing={editTx} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setEditTx(null)} />}
+      {confirmTxId && <ConfirmDialog message="Bu hareketi (tahsilat/ödeme) silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'transactions', confirmTxId)} onClose={() => setConfirmTxId(null)} />}
     </div>
   );
 }
@@ -337,6 +418,9 @@ function CustomerDetail({ customer, data, userId, onBack }) {
   const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [confirmProjectId, setConfirmProjectId] = useState(null);
+  const [editTx, setEditTx] = useState(null);
+  const [confirmTxId, setConfirmTxId] = useState(null);
+  const txById = (id) => (data.transactions || []).find((t) => t.id === id);
 
   const customerProjects = useMemo(() => projects.filter((p) => p.customerId === customer.id), [projects, customer.id]);
   const projectBalances = useMemo(() => customerProjectBalances(customer.id, data), [customer.id, data]);
@@ -403,13 +487,15 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         {rows.length === 0 ? (
           <EmptyState message="Bu cari için henüz hareket yok" />
         ) : (
-          <LedgerTable rows={rows} showProject={customerProjects.length > 0} />
+          <LedgerTable rows={rows} showProject={customerProjects.length > 0} onEditTx={(id) => setEditTx(txById(id))} onDeleteTx={(id) => setConfirmTxId(id)} />
         )}
       </Card>
 
       {payment && <PaymentForm type={payment === 'tahsilat' ? 'tahsilat' : 'odeme'} customer={customer} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setPayment(null)} />}
       {projectFormOpen && <ProjectForm customerId={customer.id} userId={userId} onClose={() => setProjectFormOpen(false)} />}
       {confirmProjectId && <ConfirmDialog message="Bu işi/projeyi silmek istediğinize emin misiniz? (İşe bağlı hareketler silinmez, 'Genel' altında kalır.)" onConfirm={() => deleteRecord(userId, 'projects', confirmProjectId)} onClose={() => setConfirmProjectId(null)} />}
+      {editTx && <TransactionForm customer={customer} existing={editTx} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setEditTx(null)} />}
+      {confirmTxId && <ConfirmDialog message="Bu hareketi (tahsilat/ödeme) silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'transactions', confirmTxId)} onClose={() => setConfirmTxId(null)} />}
     </div>
   );
 }
