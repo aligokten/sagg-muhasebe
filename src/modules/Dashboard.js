@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import {
   MoreHorizontal, ArrowUpRight, ArrowDownRight, Download, SlidersHorizontal,
-  Wallet, Users, FileText, AlertTriangle, Package,
+  Wallet, Users, FileText, AlertTriangle, Package, Moon, Sun,
 } from 'lucide-react';
 import { formatCurrency, monthKey, monthLabel, toDate, sum } from '../utils';
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
@@ -61,6 +61,14 @@ const startOfMonth = () => { const d = new Date(); return new Date(d.getFullYear
 export default function Dashboard({ data, setPage }) {
   const { invoices = [], expenses = [], incomes = [], customers = [], products = [], accounts = [], transactions = [] } = data;
   const [period, setPeriod] = useState('month');
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem('sagg-dash-dark') === '1'; } catch { return false; }
+  });
+  const toggleDark = () => setDark((d) => {
+    const nd = !d;
+    try { localStorage.setItem('sagg-dash-dark', nd ? '1' : '0'); } catch { /* yoksay */ }
+    return nd;
+  });
 
   const cariBalances = useMemo(() => allCariBalances(data), [data]);
   const accBalances = useMemo(() => allAccountBalances(data), [data]);
@@ -176,15 +184,19 @@ export default function Dashboard({ data, setPage }) {
   };
 
   return (
-    <div>
+   <div className={dark ? 'dark' : ''}>
+    <div className="dark:bg-gray-900 min-h-screen -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8 transition-colors">
       {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Satış Özeti</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">Satış Özeti</h1>
           <p className="text-sm text-gray-400 mt-1">Güncel finansal durumunuz ve hareketler</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"><Download size={15} />Excel'e Aktar</button>
+          <button onClick={toggleDark} title={dark ? 'Açık moda geç' : 'Koyu moda geç'} className="flex items-center justify-center w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-yellow-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+            {dark ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"><Download size={15} />Excel'e Aktar</button>
           <button onClick={() => setPage('reports')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-gradient-to-r from-sky-500 to-cyan-500 hover:opacity-90 shadow-sm"><SlidersHorizontal size={15} />Raporlar</button>
         </div>
       </div>
@@ -215,31 +227,31 @@ export default function Dashboard({ data, setPage }) {
             </div>
             <div className="mt-2"><ChangeBadge value={incomeChange} light /> <span className="text-xs text-white/60 ml-1">geçen aya göre</span></div>
           </div>
-          <div className="rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
+          <div className="rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-start">
               <span className="text-sm text-gray-400">Toplam Gider</span>
               <MoreHorizontal size={18} className="text-gray-300" />
             </div>
-            <div className="text-3xl font-bold text-gray-800 mt-3">{formatCurrency(totalExpense)}</div>
+            <div className="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-3">{formatCurrency(totalExpense)}</div>
             <div className="mt-2"><ChangeBadge value={expenseChange} /> <span className="text-xs text-gray-400 ml-1">geçen aya göre</span></div>
           </div>
         </div>
 
         {/* Orta: dönemsel akış */}
-        <div className="rounded-2xl p-5 bg-white border border-gray-100 shadow-sm flex flex-col">
+        <div className="rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-500">Nakit Akışı</span>
             <MoreHorizontal size={18} className="text-gray-300" />
           </div>
           <div className="flex gap-1 mt-3">
             {[{ k: 'today', l: 'Bugün' }, { k: 'week', l: 'Hafta' }, { k: 'month', l: 'Ay' }].map((t) => (
-              <button key={t.k} onClick={() => setPeriod(t.k)} className={`px-3 py-1 rounded-full text-xs font-medium ${period === t.k ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{t.l}</button>
+              <button key={t.k} onClick={() => setPeriod(t.k)} className={`px-3 py-1 rounded-full text-xs font-medium ${period === t.k ? 'bg-sky-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>{t.l}</button>
             ))}
           </div>
-          <div className="text-3xl font-bold text-gray-800 mt-4">{formatCurrency(periodIncome)}</div>
+          <div className="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-4">{formatCurrency(periodIncome)}</div>
           <p className="text-xs text-gray-400 mt-1">{periodLabel} toplam tahsilat / gelir</p>
           <div className="mt-4">
-            <div className="h-3 w-full rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-3 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-400" style={{ width: `${flowRatio}%` }} />
             </div>
             <div className="flex justify-between text-xs text-gray-400 mt-2">
@@ -250,7 +262,7 @@ export default function Dashboard({ data, setPage }) {
         </div>
 
         {/* Sağ: tahsilat oranı gauge */}
-        <div className="rounded-2xl p-5 bg-white border border-gray-100 shadow-sm flex flex-col">
+        <div className="rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-500">Tahsilat Durumu</span>
             <MoreHorizontal size={18} className="text-gray-300" />
@@ -258,7 +270,7 @@ export default function Dashboard({ data, setPage }) {
           <div className="relative mt-4">
             <Gauge percent={collectionRate} />
             <div className="absolute inset-x-0 bottom-1 flex flex-col items-center">
-              <span className="text-3xl font-bold text-gray-800">%{collectionRate.toFixed(0)}</span>
+              <span className="text-3xl font-bold text-gray-800 dark:text-gray-100">%{collectionRate.toFixed(0)}</span>
               <span className="text-xs text-gray-400">tahsil edildi</span>
             </div>
           </div>
@@ -271,12 +283,12 @@ export default function Dashboard({ data, setPage }) {
 
       {/* Alt: istatistik grafiği + son hareketler */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
+        <div className="lg:col-span-2 rounded-2xl p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-sm font-medium text-gray-500">İstatistik</h3>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xl font-bold text-gray-800">{statChange !== null ? `${statChange >= 0 ? '+' : ''}${statChange.toFixed(0)}%` : '—'}</span>
+                <span className="text-2xl font-bold text-gray-800 dark:text-gray-100">{statChange !== null ? `${statChange >= 0 ? '+' : ''}${statChange.toFixed(0)}%` : '—'}</span>
                 <ChangeBadge value={statChange} />
               </div>
               <p className="text-xs text-gray-400 mt-1">Son 7 ay aylık gelir</p>
@@ -293,9 +305,9 @@ export default function Dashboard({ data, setPage }) {
           </ResponsiveContainer>
         </div>
 
-        <div className="rounded-2xl p-5 shadow-sm border border-gray-100 bg-gradient-to-br from-sky-50 to-cyan-50/40">
+        <div className="rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 bg-gradient-to-br from-sky-50 to-cyan-50/40 dark:from-gray-800 dark:to-gray-800">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Son Hareketler</h3>
+            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-200">Son Hareketler</h3>
             <MoreHorizontal size={18} className="text-gray-300" />
           </div>
           {recent.length === 0 ? (
@@ -303,14 +315,14 @@ export default function Dashboard({ data, setPage }) {
           ) : (
             <div className="space-y-2">
               {recent.map((r, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 shadow-sm">
+                <div key={i} className="flex items-center gap-3 bg-white dark:bg-gray-700/60 rounded-xl px-3 py-2.5 shadow-sm">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>{initials(r.name)}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{r.name || '—'}</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{r.name || '—'}</p>
                     <p className="text-xs text-gray-400 truncate">{r.sub}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-800">{formatCurrency(r.amount)}</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{formatCurrency(r.amount)}</p>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${r.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{r.tag}</span>
                   </div>
                 </div>
@@ -328,15 +340,16 @@ export default function Dashboard({ data, setPage }) {
           { label: 'Cari Sayısı', value: customers.length, icon: Users, c: 'text-violet-600 bg-violet-50' },
           { label: 'Ürün/Hizmet', value: products.length, icon: Package, c: 'text-emerald-600 bg-emerald-50' },
         ].map((s, i) => (
-          <div key={i} className="rounded-2xl p-4 bg-white border border-gray-100 shadow-sm flex items-center gap-3">
+          <div key={i} className="rounded-2xl p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-3">
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.c}`}><s.icon size={20} /></div>
             <div className="min-w-0">
               <p className="text-xs text-gray-400">{s.label}</p>
-              <p className="text-lg font-bold text-gray-800 truncate">{s.value}</p>
+              <p className="text-lg font-bold text-gray-800 dark:text-gray-100 truncate">{s.value}</p>
             </div>
           </div>
         ))}
       </div>
     </div>
+   </div>
   );
 }
