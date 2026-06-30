@@ -2,7 +2,7 @@
 // Tüm kayıtlar mevcut kullanıcının altından okunur (export) veya
 // mevcut kullanıcının altına yazılır (import). Güvenlik kurallarına
 // uygundur: yalnızca kendi verinize erişirsiniz.
-import { Timestamp, addRecord, setRecord } from './firebase';
+import { Timestamp, addRecord, setRecord, fetchCollectionOnce, fetchDocOnce } from './firebase';
 import { COLLECTIONS } from './constants';
 
 const TS_KEY = '__ts';
@@ -69,6 +69,33 @@ export function downloadBackup(data) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Başka bir kullanıcının (eski misafir uid) verisini tek seferde okur.
+export async function loadFromUid(sourceUid) {
+  const collections = {};
+  let total = 0;
+  for (const name of COLLECTIONS) {
+    const recs = await fetchCollectionOnce(sourceUid, name);
+    collections[name] = recs;
+    total += recs.length;
+  }
+  const companyProfile = await fetchDocOnce(sourceUid, 'companyProfile', 'main');
+  return { collections, companyProfile, total };
+}
+
+// Okunan veriyi hedef kullanıcının altına yazar.
+export async function writeLoaded(targetUid, loaded) {
+  let count = 0;
+  for (const name of COLLECTIONS) {
+    const recs = loaded.collections[name] || [];
+    await Promise.all(recs.map((r) => { const { id, ...rest } = r; return addRecord(targetUid, name, rest); }));
+    count += recs.length;
+  }
+  if (loaded.companyProfile && Object.keys(loaded.companyProfile).length) {
+    await setRecord(targetUid, 'companyProfile', 'main', loaded.companyProfile, { merge: true });
+  }
+  return count;
 }
 
 export async function restoreBackup(userId, parsed) {

@@ -3,11 +3,40 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Download, Upload } from 'lucide-react';
 import { setRecord } from '../firebase';
 import { PageHeader, Card, Button, Field, Input, Textarea } from '../components/ui';
-import { downloadBackup, restoreBackup, countRecords } from '../backup';
+import { downloadBackup, restoreBackup, countRecords, loadFromUid, writeLoaded } from '../backup';
 
 export default function Settings({ userId, companyProfile, data = {} }) {
   const fileRef = useRef(null);
   const [restoring, setRestoring] = useState(false);
+  const [sourceUid, setSourceUid] = useState('');
+  const [migrating, setMigrating] = useState(false);
+
+  const handleMigrate = async () => {
+    const src = sourceUid.trim();
+    if (!src) return alert('Eski Kullanıcı ID (UID) girin.');
+    if (src === userId) return alert('Kaynak ID, şu anki hesabınızla aynı olamaz.');
+    setMigrating(true);
+    try {
+      const loaded = await loadFromUid(src);
+      if (loaded.total === 0) {
+        alert('Bu ID altında kayıt bulunamadı. Firebase Console → Authentication → Users listesindeki diğer (anonim) UID değerlerini deneyin.');
+        return;
+      }
+      if (!window.confirm(`${loaded.total} kayıt bulundu. Bu veriler şu anki hesabınıza taşınsın mı?`)) return;
+      const n = await writeLoaded(userId, loaded);
+      alert(`${n} kayıt taşındı. Birkaç saniye içinde görünecek. Artık güvenlik kuralını eski (katı) haline geri alabilirsiniz.`);
+      setSourceUid('');
+    } catch (err) {
+      console.error(err);
+      if (String(err.code || err.message).includes('permission')) {
+        alert('İzin hatası: Eski hesabın verisini okuyabilmek için Firestore kuralını geçici olarak gevşetmeniz gerekir (talimatlar bu sayfada).');
+      } else {
+        alert('Taşıma başarısız: ' + (err.message || err.code || ''));
+      }
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const handleRestore = async (e) => {
     const file = e.target.files?.[0];
@@ -107,6 +136,34 @@ export default function Settings({ userId, companyProfile, data = {} }) {
             <p>2) Sol menüden hesabınıza <b>Giriş Yap</b>.</p>
             <p>3) Bu sayfada <b>Yedeği Geri Yükle</b> ile indirdiğiniz dosyayı seçin. Verileriniz hesaba taşınır ve tüm cihazlara senkron olur.</p>
           </div>
+        </div>
+      </Card>
+
+      <Card title="Eski Hesaptan Veri Kurtarma / Taşıma" className="mb-6">
+        <div className="p-6">
+          <p className="text-sm text-gray-500 mb-2">
+            Yanlışlıkla yeni bir hesaba geçtiyseniz, eski (misafir) hesabınızdaki verileri buradan bu hesaba taşıyabilirsiniz.
+          </p>
+          <div className="text-xs text-gray-500 bg-amber-50 rounded-lg p-3 mb-4 space-y-1">
+            <p className="font-medium text-amber-700">Önce Firestore kuralını GEÇİCİ olarak gevşetin:</p>
+            <p>Firebase Console → Firestore Database → Rules → aşağıdakini yapıştırıp Publish edin:</p>
+            <pre className="bg-white border rounded p-2 mt-1 overflow-x-auto text-[11px] leading-snug">{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /artifacts/{appId}/users/{userId}/{document=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null; // GEÇİCİ
+    }
+  }
+}`}</pre>
+            <p className="mt-1">Taşıma bittikten sonra <b>read</b> satırını eski haline (<code>request.auth.uid == userId</code>) geri alın.</p>
+          </div>
+          <p className="text-xs text-gray-500 mb-1">Eski Kullanıcı ID (Firebase Console → Authentication → Users → anonim kullanıcının UID'i):</p>
+          <div className="flex flex-wrap gap-3 items-center">
+            <Input value={sourceUid} onChange={(e) => setSourceUid(e.target.value)} placeholder="örn. a2hwft1BjdOGKiBXp4HsRz0LVTu1" className="flex-1 min-w-[240px]" />
+            <Button icon={Upload} onClick={handleMigrate} disabled={migrating}>{migrating ? 'Taşınıyor...' : 'Veriyi Taşı'}</Button>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-2">Şu anki hesabınızın UID'i: <code className="break-all">{userId}</code></p>
         </div>
       </Card>
     </div>

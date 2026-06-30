@@ -16,6 +16,8 @@ import {
   Timestamp,
   setDoc,
   updateDoc,
+  getDocs,
+  getDoc,
 } from 'firebase/firestore';
 
 // Bu bilgiler Firebase projesinden alınmıştır.
@@ -67,6 +69,18 @@ export const subscribeCollection = (userId, name, cb) =>
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     (err) => console.error(`'${name}' okunurken hata:`, err)
   );
+
+// Belirli bir kullanıcının bir koleksiyonunu tek seferlik okur (taşıma için).
+export const fetchCollectionOnce = async (uid, name) => {
+  const snap = await getDocs(colRef(uid, name));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+};
+
+// Belirli bir kullanıcının tek bir dökümanını tek seferlik okur.
+export const fetchDocOnce = async (uid, name, id) => {
+  const s = await getDoc(docRef(uid, name, id));
+  return s.exists() ? s.data() : null;
+};
 
 // Tek bir dökümanı canlı dinler.
 export const subscribeDoc = (userId, name, id, cb, onMissing) =>

@@ -2,9 +2,9 @@
 // Cari seçilir, her satıra bir müellif + ücreti girilir. Kaydedince
 // cariye yeni bir İş/Proje açılır ve müellifler o işe sözleşme bedeliyle atanır.
 import React, { useState, useMemo } from 'react';
-import { X, Trash2, FileText, Eye, Briefcase, DraftingCompass } from 'lucide-react';
+import { X, Trash2, FileText, Eye, Briefcase, DraftingCompass, Edit } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
-import { formatCurrency, sum, nextDocNumber, todayInput } from '../utils';
+import { formatCurrency, sum, nextDocNumber, todayInput, toInputDate } from '../utils';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
   ConfirmDialog, Button, Field, Input, Select, ActionMenu,
@@ -20,8 +20,16 @@ const statusMeta = {
 
 const emptyLine = () => ({ authorId: '', branch: '', description: '', amount: '' });
 
-function QuoteForm({ records, customers, authors, userId, onClose }) {
-  const [form, setForm] = useState({
+function QuoteForm({ existing, records, customers, authors, subcontracts = [], userId, onClose }) {
+  const [form, setForm] = useState(() => existing ? {
+    customerId: existing.customerId || '',
+    projectName: existing.projectName || '',
+    docNumber: existing.docNumber || '',
+    date: toInputDate(existing.date),
+    validUntil: toInputDate(existing.validUntil || existing.date),
+    note: existing.note || '',
+    lines: (existing.lines || []).map((l) => ({ authorId: l.authorId || '', branch: l.branch || '', description: l.description || '', amount: l.amount ?? '' })),
+  } : {
     customerId: '',
     projectName: '',
     docNumber: nextDocNumber(records, 'TK'),
@@ -64,13 +72,40 @@ function QuoteForm({ records, customers, authors, userId, onClose }) {
 
     setSaving(true);
     try {
-      // 1) Cariye yeni iş/proje aç
+      if (existing) {
+        // DÜZENLEME: teklif kaydını güncelle
+        await updateRecord(userId, 'quotes', existing.id, {
+          projectName: form.projectName.trim(),
+          date: Timestamp.fromDate(new Date(form.date)),
+          validUntil: Timestamp.fromDate(new Date(form.validUntil)),
+          note: form.note, lines: validLines, grandTotal: total,
+        });
+        // Bağlı işi ve müellif atamalarını eşitle (authorId ile eşleştir)
+        if (existing.createdProjectId) {
+          await updateRecord(userId, 'projects', existing.createdProjectId, { name: form.projectName.trim() });
+          const projSubs = subcontracts.filter((s) => s.projectId === existing.createdProjectId);
+          await Promise.all(validLines.map((l) => {
+            const match = projSubs.find((s) => s.authorId === l.authorId);
+            if (match) {
+              return updateRecord(userId, 'subcontracts', match.id, { agreedAmount: l.amount, branch: l.branch, note: l.description, authorName: l.authorName });
+            }
+            return addRecord(userId, 'subcontracts', {
+              projectId: existing.createdProjectId, customerId: customer.id,
+              authorId: l.authorId, authorName: l.authorName, branch: l.branch,
+              agreedAmount: l.amount, note: l.description,
+            });
+          }));
+        }
+        onClose();
+        return;
+      }
+
+      // YENİ: cariye iş aç + müellifleri ata + teklif kaydı oluştur
       const projectRef = await addRecord(userId, 'projects', {
         customerId: customer.id, name: form.projectName.trim(),
         description: `Teklif ${form.docNumber} ile oluşturuldu`, address: '',
         status: 'active', openingBalance: 0, openingType: 'borc',
       });
-      // 2) Müellifleri işe ata (sözleşme bedeli = ücret)
       await Promise.all(validLines.map((l) =>
         addRecord(userId, 'subcontracts', {
           projectId: projectRef.id, customerId: customer.id,
@@ -78,7 +113,6 @@ function QuoteForm({ records, customers, authors, userId, onClose }) {
           agreedAmount: l.amount, note: l.description,
         })
       ));
-      // 3) Teklif kaydını oluştur
       await addRecord(userId, 'quotes', {
         docNumber: form.docNumber, customerId: customer.id, customerSnapshot: customer,
         projectName: form.projectName.trim(), createdProjectId: projectRef.id,
@@ -102,7 +136,7 @@ function QuoteForm({ records, customers, authors, userId, onClose }) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl my-8">
         <form onSubmit={submit}>
           <div className="p-5 border-b flex justify-between items-center">
-            <h3 className="text-xl font-semibold text-gray-800">Yeni Teklif (Müellif Bazlı)</h3>
+            <h3 className="text-xl font-semibold text-gray-800">{existing ? 'Teklif Düzenle' : 'Yeni Teklif (Müellif Bazlı)'}</h3>
             <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X /></button>
           </div>
 
@@ -114,7 +148,7 @@ function QuoteForm({ records, customers, authors, userId, onClose }) {
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <Field label="Cari Hesap" className="lg:col-span-2">
-                <Select name="customerId" value={form.customerId} onChange={setField} required>
+                <Select name="customerId" value={form.customerId} onChange={setField} required disabled={!!existing}>
                   <option value="">Seçiniz...</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
@@ -122,7 +156,7 @@ function QuoteForm({ records, customers, authors, userId, onClose }) {
               <Field label="İş / Proje Adı" className="lg:col-span-2">
                 <Input name="projectName" value={form.projectName} onChange={setField} placeholder="örn. Bağdat Cd. Apartmanı" required />
               </Field>
-              <Field label="Teklif No"><Input name="docNumber" value={form.docNumber} onChange={setField} required /></Field>
+              <Field label="Teklif No"><Input name="docNumber" value={form.docNumber} onChange={setField} required readOnly={!!existing} /></Field>
               <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={setField} required /></Field>
               <Field label="Geçerlilik"><Input type="date" name="validUntil" value={form.validUntil} onChange={setField} /></Field>
             </div>
@@ -176,8 +210,9 @@ function QuoteForm({ records, customers, authors, userId, onClose }) {
 }
 
 export default function Quotes({ data, userId }) {
-  const { quotes = [], customers = [], authors = [], companyProfile, scriptsLoaded } = data;
+  const { quotes = [], customers = [], authors = [], subcontracts = [], companyProfile, scriptsLoaded } = data;
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
 
@@ -197,7 +232,7 @@ export default function Quotes({ data, userId }) {
   return (
     <div>
       <PageHeader title="Teklifler" subtitle="Müellif bazlı teklif hazırlayın; kaydedince cariye iş olarak işlenir">
-        <AddButton label="Yeni Teklif" onClick={() => setFormOpen(true)} />
+        <AddButton label="Yeni Teklif" onClick={() => { setEditing(null); setFormOpen(true); }} />
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -225,6 +260,7 @@ export default function Quotes({ data, userId }) {
                     <ActionMenu
                       items={[
                         { label: 'Görüntüle / Yazdır', icon: Eye, onClick: () => setViewing(q) },
+                        { label: 'Düzenle', icon: Edit, onClick: () => { setEditing(q); setFormOpen(true); } },
                         { label: 'Kabul Edildi', onClick: () => updateRecord(userId, 'quotes', q.id, { status: 'accepted' }) },
                         { label: 'Reddedildi', onClick: () => updateRecord(userId, 'quotes', q.id, { status: 'rejected' }) },
                         { label: 'Sil', icon: Trash2, danger: true, onClick: () => setConfirmId(q.id) },
@@ -238,7 +274,7 @@ export default function Quotes({ data, userId }) {
         )}
       </Card>
 
-      {formOpen && <QuoteForm records={quotes} customers={customers} authors={authors} userId={userId} onClose={() => setFormOpen(false)} />}
+      {formOpen && <QuoteForm existing={editing} records={quotes} customers={customers} authors={authors} subcontracts={subcontracts} userId={userId} onClose={() => { setFormOpen(false); setEditing(null); }} />}
       {viewing && <PrintView doc={printable} companyProfile={companyProfile} heading="TEKLİF" scriptsLoaded={scriptsLoaded} onClose={() => setViewing(null)} />}
       {confirmId && <ConfirmDialog message="Bu teklifi silmek istediğinize emin misiniz? (Oluşturulan iş ve müellif atamaları silinmez; onları cariden yönetebilirsiniz.)" onConfirm={() => deleteRecord(userId, 'quotes', confirmId)} onClose={() => setConfirmId(null)} />}
     </div>
