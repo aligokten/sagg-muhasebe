@@ -11,6 +11,9 @@
 # production
 /build
 
+# electron-builder çıktısı (masaüstü uygulaması paketleri)
+/release
+
 # misc
 .DS_Store
 .env.local
