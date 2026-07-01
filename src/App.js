@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
-  TrendingUp, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff, ListChecks,
+  TrendingUp, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff, ListChecks, Calculator,
 } from 'lucide-react';
 
 import {
@@ -30,6 +30,7 @@ import Reports from './modules/Reports';
 import Agenda from './modules/Agenda';
 import Settings from './modules/Settings';
 import AllTransactions from './modules/AllTransactions';
+import { CalculatorModal } from './components/DashboardGadgets';
 import ArsaPaylastir from './ArsaPaylastir';
 
 const EMPTY_DATA = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
@@ -73,13 +74,14 @@ const NAV_GROUPS = [
     title: 'Diğer',
     items: [
       { id: 'reports', label: 'Raporlar', icon: BarChart3 },
+      { id: 'calculator', label: 'Hesap Makinesi', icon: Calculator, action: 'calc' },
       { id: 'arsapay', label: 'Arsa Paylaştır', icon: Ruler },
       { id: 'settings', label: 'Ayarlar', icon: SettingsIcon },
     ],
   },
 ];
 
-const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, onLogout, logo, mobileOpen, setMobileOpen }) => (
+const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, onLogout, logo, mobileOpen, setMobileOpen, onOpenCalc }) => (
   <>
     {mobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
     <nav className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-gray-800 text-white flex flex-col no-print transform transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -109,8 +111,11 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, 
               {group.items.map((item) => (
                 <li key={item.id} className="px-2">
                   <button
-                    onClick={() => { setCurrentPage(item.id); setMobileOpen(false); }}
-                    className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === item.id ? 'bg-orange-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                    onClick={() => {
+                      if (item.action === 'calc') { onOpenCalc(); setMobileOpen(false); }
+                      else { setCurrentPage(item.id); setMobileOpen(false); }
+                    }}
+                    className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === item.id && !item.action ? 'bg-orange-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
                   >
                     <item.icon className="h-5 w-5 flex-shrink-0" />
                     <span className="ml-3 font-medium">{item.label}</span>
@@ -173,6 +178,8 @@ export default function App() {
     try { return localStorage.getItem('sagg-avatar') || 'user'; } catch { return 'user'; }
   });
   const pickAvatar = (a) => { setAvatar(a); try { localStorage.setItem('sagg-avatar', a); } catch { /* yoksay */ } };
+
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const [data, setData] = useState({ ...EMPTY_DATA, companyProfile: { companyName: '', address: '', bankAccounts: [] } });
 
@@ -292,6 +299,7 @@ export default function App() {
         logo={data.companyProfile?.logo}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
+        onOpenCalc={() => setCalcOpen(true)}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar
@@ -311,6 +319,7 @@ export default function App() {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
       </div>
       {authOpen && <AuthModal isAnonymous={isAnonymous} onClose={() => setAuthOpen(false)} />}
+      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
     </div>
   );
 }
