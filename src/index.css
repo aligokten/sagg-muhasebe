@@ -42,3 +42,18 @@ body {
 .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #374151 !important; }
 /* form alanları için odak/zemin uyumu */
 .dark select option { background-color: #1f2937; color: #f1f5f9; }
+
+/* --- Yazdırılan/PDF belgeleri her zaman AÇIK MOD --- */
+/* (fatura/teklif dökümü koyu modda bile beyaz zeminli, koyu yazılı kalsın) */
+#doc-print-area { color-scheme: light; background-color: #ffffff !important; color: #1f2937; }
+.dark #doc-print-area,
+.dark #doc-print-area .bg-white { background-color: #ffffff !important; }
+.dark #doc-print-area .bg-gray-50 { background-color: #f9fafb !important; }
+.dark #doc-print-area .text-gray-900,
+.dark #doc-print-area .text-gray-800,
+.dark #doc-print-area .text-gray-700 { color: #1f2937 !important; }
+.dark #doc-print-area .text-gray-600 { color: #4b5563 !important; }
+.dark #doc-print-area .text-gray-500 { color: #6b7280 !important; }
+.dark #doc-print-area .text-gray-400 { color: #9ca3af !important; }
+.dark #doc-print-area .text-gray-300 { color: #d1d5db !important; }
+.dark #doc-print-area [class*="border"] { border-color: #e5e7eb !important; }
