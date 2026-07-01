@@ -1,6 +1,9 @@
 // --- Cari Hesaplar (müşteri / tedarikçi) + işler/projeler + ekstre + tahsilat/ödeme ---
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote } from 'lucide-react';
+import {
+  ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote,
+  FolderKanban, HardHat, AudioLines, ListChecks,
+} from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput, toInputDate } from '../utils';
 import { downloadExcel } from '../exportExcel';
@@ -12,6 +15,15 @@ import {
 import QuickEntry from '../components/QuickEntry';
 import { BRANCHES } from './Authors';
 import { CategorySelect } from '../categories';
+
+// İş/proje türleri (her biri ayrı ikonla temsil edilir)
+const JOB_TYPES = [
+  { key: 'proje', label: 'Proje', icon: FolderKanban },
+  { key: 'insaat', label: 'İnşaat', icon: HardHat },
+  { key: 'akustik', label: 'Akustik Rapor', icon: AudioLines },
+  { key: 'takip', label: 'İş Takibi', icon: ListChecks },
+];
+const jobTypeMeta = (key) => JOB_TYPES.find((j) => j.key === key) || JOB_TYPES[0];
 
 const balanceBadge = (bal) => {
   if (Math.abs(bal) < 0.01) return <Badge color="gray">Bakiye Yok</Badge>;
@@ -98,7 +110,7 @@ function CustomerForm({ existing, userId, onClose }) {
 // --- İş / Proje ekleme-düzenleme formu ---
 function ProjectForm({ customerId, existing, userId, onClose }) {
   const [form, setForm] = useState(
-    existing || { customerId, name: '', description: '', address: '', status: 'active', openingBalance: 0, openingType: 'borc' }
+    existing || { customerId, jobType: 'proje', name: '', description: '', address: '', status: 'active', openingBalance: 0, openingType: 'borc' }
   );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const submit = async (e) => {
@@ -115,6 +127,21 @@ function ProjectForm({ customerId, existing, userId, onClose }) {
   return (
     <FormModal title={existing ? 'İş / Proje Düzenle' : 'Yeni İş / Proje'} size="lg" onSubmit={submit} onClose={onClose}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="İş Türü" className="md:col-span-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {JOB_TYPES.map((jt) => (
+              <button
+                key={jt.key}
+                type="button"
+                onClick={() => setForm({ ...form, jobType: jt.key })}
+                className={`flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border text-xs font-medium transition-colors ${(form.jobType || 'proje') === jt.key ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+              >
+                <jt.icon size={18} />
+                {jt.label}
+              </button>
+            ))}
+          </div>
+        </Field>
         <Field label="İş Adı" className="md:col-span-2"><Input name="name" value={form.name} onChange={set} required placeholder="örn. Bağdat Cd. Arsası - İnşaat" /></Field>
         <Field label="Adres / Ada-Parsel" className="md:col-span-2"><Input name="address" value={form.address} onChange={set} /></Field>
         <Field label="Açıklama" className="md:col-span-2"><Textarea name="description" value={form.description} onChange={set} /></Field>
@@ -355,6 +382,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
   const [confirmTxId, setConfirmTxId] = useState(null);
   const customerProjects = (data.projects || []).filter((p) => p.customerId === customer.id);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
+  const JobIcon = jobTypeMeta(project.jobType).icon;
 
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data, project.id), [customer, project, data]);
   const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
@@ -375,7 +403,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
       <button onClick={onBack} className="flex items-center text-sm text-gray-500 hover:text-gray-800 mb-4"><ArrowLeft size={16} className="mr-1" />{customer.name} işlerine dön</button>
       <div className="flex flex-col lg:flex-row justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Briefcase size={22} className="text-orange-600" />{project.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><JobIcon size={22} className="text-orange-600" />{project.name}</h1>
           <p className="text-sm text-gray-500 mt-1">{customer.name}{project.address ? ` · ${project.address}` : ''}</p>
           {project.description && <p className="text-sm text-gray-500 mt-1">{project.description}</p>}
         </div>
@@ -499,10 +527,12 @@ function CustomerDetail({ customer, data, userId, onBack }) {
           <EmptyState message="Bu cariye ait iş/proje yok. Farklı arsa/işleri ayrı takip etmek için 'Yeni İş' ekleyin." icon={Briefcase} />
         ) : (
           <Table headers={[{ label: 'İş / Proje' }, { label: 'Adres' }, { label: 'Durum' }, { label: 'Bakiye', align: 'right' }, { label: '' }]}>
-            {customerProjects.map((p) => (
+            {customerProjects.map((p) => {
+              const PIcon = jobTypeMeta(p.jobType).icon;
+              return (
               <tr key={p.id} className="hover:bg-gray-50">
                 <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setSelectedProject(p)}>
-                  <span className="flex items-center gap-2"><Briefcase size={15} className="text-orange-600" />{p.name}</span>
+                  <span className="flex items-center gap-2"><PIcon size={15} className="text-orange-600" />{p.name}</span>
                 </Td>
                 <Td className="text-gray-500">{p.address || '-'}</Td>
                 <Td><Badge color={p.status === 'done' ? 'green' : p.status === 'paused' ? 'yellow' : 'sky'}>{p.status === 'done' ? 'Tamamlandı' : p.status === 'paused' ? 'Beklemede' : 'Devam Ediyor'}</Badge></Td>
@@ -511,7 +541,8 @@ function CustomerDetail({ customer, data, userId, onBack }) {
                   <button onClick={() => setConfirmProjectId(p.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
                 </Td>
               </tr>
-            ))}
+              );
+            })}
           </Table>
         )}
       </Card>
