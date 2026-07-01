@@ -1,20 +1,25 @@
-// --- Müşteri: ödeme yöntemi seçimi (kredi kartı yakında / havale bildirimi) ---
+// --- Müşteri: abonelik paketi + ödeme yöntemi seçimi (kredi kartı yakında / havale bildirimi) ---
 import React, { useEffect, useState } from 'react';
 import { CreditCard, Landmark, CheckCircle2 } from 'lucide-react';
-import { subscribePaymentInfo, createPaymentRequest } from '../firebase';
+import { subscribePaymentInfo, subscribePricingPlans, createPaymentRequest } from '../firebase';
+import { formatCurrency } from '../utils';
+import { PLAN_OPTIONS } from '../constants';
 import { Modal, Button } from './ui';
 
 export default function PaymentOptions({ userId, userEmail, onClose }) {
   const [paymentInfo, setPaymentInfo] = useState(null);
-  const [step, setStep] = useState('choose'); // choose | transfer | sent
+  const [pricing, setPricing] = useState(null);
+  const [plan, setPlan] = useState(null);
+  const [step, setStep] = useState('plan'); // plan | choose | transfer | sent
   const [busy, setBusy] = useState(false);
 
   useEffect(() => subscribePaymentInfo(setPaymentInfo), []);
+  useEffect(() => subscribePricingPlans(setPricing), []);
 
   const confirmTransferSent = async () => {
     setBusy(true);
     try {
-      await createPaymentRequest(userId, userEmail, 'havale');
+      await createPaymentRequest(userId, userEmail, 'havale', '', plan);
       setStep('sent');
     } finally {
       setBusy(false);
@@ -55,23 +60,46 @@ export default function PaymentOptions({ userId, userEmail, onClose }) {
     );
   }
 
+  if (step === 'choose') {
+    return (
+      <Modal title="Ödeme Yöntemi Seçin" size="sm" onClose={onClose}>
+        <div className="space-y-3">
+          <button type="button" disabled className="w-full flex items-center gap-3 p-4 rounded-xl border border-gray-200 opacity-50 cursor-not-allowed text-left">
+            <CreditCard className="text-gray-400 flex-shrink-0" size={22} />
+            <span>
+              <span className="block font-medium text-gray-700">Kredi Kartı ile Öde</span>
+              <span className="block text-xs text-gray-400">Yakında</span>
+            </span>
+          </button>
+          <button type="button" onClick={() => setStep('transfer')} className="w-full flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 text-left">
+            <Landmark className="text-orange-600 flex-shrink-0" size={22} />
+            <span>
+              <span className="block font-medium text-gray-700">Havale / EFT ile Öde</span>
+              <span className="block text-xs text-gray-400">Hesap bilgilerini görüntüle</span>
+            </span>
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal title="Ödeme Yöntemi Seçin" size="sm" onClose={onClose}>
+    <Modal title="Abonelik Paketi Seçin" size="sm" onClose={onClose}>
       <div className="space-y-3">
-        <button type="button" disabled className="w-full flex items-center gap-3 p-4 rounded-xl border border-gray-200 opacity-50 cursor-not-allowed text-left">
-          <CreditCard className="text-gray-400 flex-shrink-0" size={22} />
-          <span>
-            <span className="block font-medium text-gray-700">Kredi Kartı ile Öde</span>
-            <span className="block text-xs text-gray-400">Yakında</span>
-          </span>
-        </button>
-        <button type="button" onClick={() => setStep('transfer')} className="w-full flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 text-left">
-          <Landmark className="text-orange-600 flex-shrink-0" size={22} />
-          <span>
-            <span className="block font-medium text-gray-700">Havale / EFT ile Öde</span>
-            <span className="block text-xs text-gray-400">Hesap bilgilerini görüntüle</span>
-          </span>
-        </button>
+        {PLAN_OPTIONS.map((p) => {
+          const price = pricing?.[p.key];
+          return (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => { setPlan(p.key); setStep('choose'); }}
+              className="w-full flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 text-left"
+            >
+              <span className="font-medium text-gray-700">{p.label}</span>
+              <span className="font-semibold text-orange-600">{price ? formatCurrency(price) : 'Fiyat belirtilmemiş'}</span>
+            </button>
+          );
+        })}
       </div>
     </Modal>
   );
