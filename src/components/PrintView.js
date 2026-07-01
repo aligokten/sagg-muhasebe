@@ -111,7 +111,7 @@ export default function PrintView({ doc, companyProfile, heading = 'FATURA', onC
     }
     try {
       const { jsPDF } = window.jspdf;
-      const canvas = await window.html2canvas(printRef.current, { scale: 2 });
+      const canvas = await window.html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
       const pw = pdf.internal.pageSize.getWidth();

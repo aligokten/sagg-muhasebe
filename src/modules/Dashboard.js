@@ -9,6 +9,7 @@ import { formatCurrency, monthKey, monthLabel, toDate, formatDateShort, sum } fr
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
 import { downloadExcel } from '../exportExcel';
 import { randomQuote } from '../quotes';
+import { MarketWidget, MiniCalculator } from '../components/DashboardGadgets';
 
 const initials = (name) =>
   (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase();
@@ -154,16 +155,24 @@ export default function Dashboard({ data, setPage }) {
         </div>
       </div>
 
-      {/* Günün özdeyişi (her açılışta değişir) */}
-      <div className="relative mb-6 ml-1">
-        <div className="flex items-start gap-3 rounded-2xl rounded-tl-sm bg-orange-50 dark:bg-gray-800 border border-orange-100 dark:border-gray-700 px-4 py-3 max-w-3xl shadow-sm">
-          <Quote size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">
-            <span className="italic">“{quote.text}”</span>
-            <span className="font-semibold text-orange-600 dark:text-orange-400"> — {quote.author}</span>
-          </p>
+      {/* Özdeyiş + piyasa/hesap makinesi gadget'ları */}
+      <div className="flex flex-col lg:flex-row gap-4 mb-6 items-start">
+        {/* Günün özdeyişi (her açılışta değişir) */}
+        <div className="relative flex-1 w-full ml-1 lg:mt-1">
+          <div className="flex items-start gap-3 rounded-2xl rounded-tl-sm bg-orange-50 dark:bg-gray-800 border border-orange-100 dark:border-gray-700 px-4 py-3 shadow-sm">
+            <Quote size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">
+              <span className="italic">“{quote.text}”</span>
+              <span className="font-semibold text-orange-600 dark:text-orange-400"> — {quote.author}</span>
+            </p>
+          </div>
+          <span className="absolute -top-1.5 left-4 w-3 h-3 rotate-45 bg-orange-50 dark:bg-gray-800 border-l border-t border-orange-100 dark:border-gray-700" />
         </div>
-        <span className="absolute -top-1.5 left-4 w-3 h-3 rotate-45 bg-orange-50 dark:bg-gray-800 border-l border-t border-orange-100 dark:border-gray-700" />
+        {/* Gadget'lar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full lg:w-[540px] flex-shrink-0">
+          <MarketWidget />
+          <MiniCalculator />
+        </div>
       </div>
 
       {/* Uyarı şeridi */}
