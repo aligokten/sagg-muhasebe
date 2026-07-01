@@ -18,6 +18,7 @@ import {
 import QuickEntry from '../components/QuickEntry';
 import { BRANCHES } from './Authors';
 import { TRADES } from './Contractors';
+import { EntryForm as IncomeExpenseForm } from './CashFlow';
 import { CategorySelect } from '../categories';
 
 // İş/proje türleri (her biri ayrı ikonla temsil edilir)
@@ -474,8 +475,12 @@ function TransactionForm({ customer, existing, userId, accounts, projects, onClo
 }
 
 // --- Ekstre tablosu (cari ya da proje) ---
-function LedgerTable({ rows, showProject, onEditTx, onDeleteTx }) {
-  const actions = !!(onEditTx || onDeleteTx);
+// Ekstredeki hangi kayıt türlerinin doğrudan düzenlenip silinebileceği.
+// Fatura ve çek/senet kendi sayfalarında (Faturalar / Çek & Senet) yönetilir.
+const EDITABLE_REF_KINDS = ['transaction', 'income', 'expense'];
+
+function LedgerTable({ rows, showProject, onEdit, onDelete }) {
+  const actions = !!(onEdit || onDelete);
   const headers = [
     { label: 'Tarih' }, { label: 'İşlem' }, { label: 'Açıklama' },
     ...(showProject ? [{ label: 'İş/Proje' }] : []),
@@ -498,11 +503,11 @@ function LedgerTable({ rows, showProject, onEditTx, onDeleteTx }) {
           <Td align="right" className="font-semibold text-gray-800">{formatCurrency(Math.abs(r.balance))} {r.balance >= 0 ? '(B)' : '(A)'}</Td>
           {actions && (
             <Td align="right">
-              {r.ref?.kind === 'transaction' ? (
+              {EDITABLE_REF_KINDS.includes(r.ref?.kind) ? (
                 <ActionMenu
                   items={[
-                    { label: 'Düzenle', icon: Edit, onClick: () => onEditTx(r.ref.id) },
-                    { label: 'Sil', icon: Trash2, danger: true, onClick: () => onDeleteTx(r.ref.id) },
+                    { label: 'Düzenle', icon: Edit, onClick: () => onEdit(r.ref) },
+                    { label: 'Sil', icon: Trash2, danger: true, onClick: () => onDelete(r.ref) },
                   ]}
                 />
               ) : null}
@@ -523,10 +528,23 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
   const [confirmSubId, setConfirmSubId] = useState(null);
   const [editTx, setEditTx] = useState(null);
   const [confirmTxId, setConfirmTxId] = useState(null);
+  const [editIncomeExpense, setEditIncomeExpense] = useState(null); // { kind, record }
+  const [confirmIncomeExpense, setConfirmIncomeExpense] = useState(null); // { kind, id }
   const customerProjects = getCustomerProjects(customer.id, data);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const JobIcon = jobTypeMeta(project.jobType).icon;
   const isConstruction = project.jobType === 'insaat';
+
+  const handleLedgerEdit = (ref) => {
+    if (ref.kind === 'transaction') setEditTx(txById(ref.id));
+    else if (ref.kind === 'income') setEditIncomeExpense({ kind: 'incomes', record: (data.incomes || []).find((x) => x.id === ref.id) });
+    else if (ref.kind === 'expense') setEditIncomeExpense({ kind: 'expenses', record: (data.expenses || []).find((x) => x.id === ref.id) });
+  };
+  const handleLedgerDelete = (ref) => {
+    if (ref.kind === 'transaction') setConfirmTxId(ref.id);
+    else if (ref.kind === 'income') setConfirmIncomeExpense({ kind: 'incomes', id: ref.id });
+    else if (ref.kind === 'expense') setConfirmIncomeExpense({ kind: 'expenses', id: ref.id });
+  };
 
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data, project.id), [customer, project, data]);
   const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
@@ -676,7 +694,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
 
       <Card title="Müşteri Hesap Ekstresi (bu iş)">
         {rows.length === 0 ? <EmptyState message="Bu iş için henüz hareket yok" /> : (
-          <LedgerTable rows={rows} showProject={false} onEditTx={(id) => setEditTx(txById(id))} onDeleteTx={(id) => setConfirmTxId(id)} />
+          <LedgerTable rows={rows} showProject={false} onEdit={handleLedgerEdit} onDelete={handleLedgerDelete} />
         )}
       </Card>
 
@@ -700,6 +718,25 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
       )}
       {editTx && <TransactionForm customer={customer} existing={editTx} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setEditTx(null)} />}
       {confirmTxId && <ConfirmDialog message="Bu hareketi (tahsilat/ödeme) silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'transactions', confirmTxId)} onClose={() => setConfirmTxId(null)} />}
+      {editIncomeExpense && (
+        <IncomeExpenseForm
+          kind={editIncomeExpense.kind}
+          existing={editIncomeExpense.record}
+          existingList={[]}
+          userId={userId}
+          accounts={accounts}
+          customers={data.customers || []}
+          projects={data.projects || []}
+          onClose={() => setEditIncomeExpense(null)}
+        />
+      )}
+      {confirmIncomeExpense && (
+        <ConfirmDialog
+          message={`Bu ${confirmIncomeExpense.kind === 'incomes' ? 'geliri' : 'gideri'} silmek istediğinize emin misiniz?`}
+          onConfirm={() => deleteRecord(userId, confirmIncomeExpense.kind, confirmIncomeExpense.id)}
+          onClose={() => setConfirmIncomeExpense(null)}
+        />
+      )}
     </div>
   );
 }
@@ -715,8 +752,21 @@ function CustomerDetail({ customer, data, userId, onBack }) {
   const [confirmUnlinkId, setConfirmUnlinkId] = useState(null);
   const [editTx, setEditTx] = useState(null);
   const [confirmTxId, setConfirmTxId] = useState(null);
+  const [editIncomeExpense, setEditIncomeExpense] = useState(null); // { kind, record }
+  const [confirmIncomeExpense, setConfirmIncomeExpense] = useState(null); // { kind, id }
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const isSupplierRole = customer.role === 'supplier' || customer.role === 'both';
+
+  const handleLedgerEdit = (ref) => {
+    if (ref.kind === 'transaction') setEditTx(txById(ref.id));
+    else if (ref.kind === 'income') setEditIncomeExpense({ kind: 'incomes', record: (data.incomes || []).find((x) => x.id === ref.id) });
+    else if (ref.kind === 'expense') setEditIncomeExpense({ kind: 'expenses', record: (data.expenses || []).find((x) => x.id === ref.id) });
+  };
+  const handleLedgerDelete = (ref) => {
+    if (ref.kind === 'transaction') setConfirmTxId(ref.id);
+    else if (ref.kind === 'income') setConfirmIncomeExpense({ kind: 'incomes', id: ref.id });
+    else if (ref.kind === 'expense') setConfirmIncomeExpense({ kind: 'expenses', id: ref.id });
+  };
 
   const customerProjects = useMemo(() => getCustomerProjects(customer.id, data), [data, customer.id]);
   // Not: customerProjectBalances yalnızca sahip olunan işleri hesaplar; bağlı (tedarikçi) işler
@@ -807,7 +857,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         {rows.length === 0 ? (
           <EmptyState message="Bu cari için henüz hareket yok" />
         ) : (
-          <LedgerTable rows={rows} showProject={customerProjects.length > 0} onEditTx={(id) => setEditTx(txById(id))} onDeleteTx={(id) => setConfirmTxId(id)} />
+          <LedgerTable rows={rows} showProject={customerProjects.length > 0} onEdit={handleLedgerEdit} onDelete={handleLedgerDelete} />
         )}
       </Card>
 
@@ -826,6 +876,25 @@ function CustomerDetail({ customer, data, userId, onBack }) {
       {confirmUnlinkId && <ConfirmDialog message="Bu işe olan bağlantınız kaldırılsın mı? (İş kaydı silinmez, sadece bu cariden bağlantısı kesilir.)" onConfirm={() => deleteRecord(userId, 'projectLinks', confirmUnlinkId)} onClose={() => setConfirmUnlinkId(null)} />}
       {editTx && <TransactionForm customer={customer} existing={editTx} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setEditTx(null)} />}
       {confirmTxId && <ConfirmDialog message="Bu hareketi (tahsilat/ödeme) silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'transactions', confirmTxId)} onClose={() => setConfirmTxId(null)} />}
+      {editIncomeExpense && (
+        <IncomeExpenseForm
+          kind={editIncomeExpense.kind}
+          existing={editIncomeExpense.record}
+          existingList={[]}
+          userId={userId}
+          accounts={accounts}
+          customers={data.customers || []}
+          projects={data.projects || []}
+          onClose={() => setEditIncomeExpense(null)}
+        />
+      )}
+      {confirmIncomeExpense && (
+        <ConfirmDialog
+          message={`Bu ${confirmIncomeExpense.kind === 'incomes' ? 'geliri' : 'gideri'} silmek istediğinize emin misiniz?`}
+          onConfirm={() => deleteRecord(userId, confirmIncomeExpense.kind, confirmIncomeExpense.id)}
+          onClose={() => setConfirmIncomeExpense(null)}
+        />
+      )}
     </div>
   );
 }
