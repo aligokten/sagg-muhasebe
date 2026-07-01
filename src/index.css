@@ -64,3 +64,19 @@ body {
 .dark #doc-print-area .text-gray-400 { color: #9ca3af !important; }
 .dark #doc-print-area .text-gray-300 { color: #d1d5db !important; }
 .dark #doc-print-area [class*="border"] { border-color: #e5e7eb !important; }
+
+#receipt-print-area { color-scheme: light; background-color: #ffffff !important; color: #1f2937; }
+.dark #receipt-print-area,
+.dark #receipt-print-area .bg-white { background-color: #ffffff !important; }
+.dark #receipt-print-area .bg-gray-50,
+.dark #receipt-print-area .bg-gray-100 { background-color: #f3f4f6 !important; }
+.dark #receipt-print-area .text-gray-900,
+.dark #receipt-print-area .text-gray-800,
+.dark #receipt-print-area .text-gray-700 { color: #1f2937 !important; }
+.dark #receipt-print-area .text-gray-600 { color: #4b5563 !important; }
+.dark #receipt-print-area .text-gray-500 { color: #6b7280 !important; }
+.dark #receipt-print-area .text-gray-400 { color: #9ca3af !important; }
+.dark #receipt-print-area .border-gray-200 { border-color: #e5e7eb !important; }
+.dark #receipt-print-area .border-gray-400 { border-color: #9ca3af !important; }
+.dark #receipt-print-area .border-gray-500 { border-color: #6b7280 !important; }
+.dark #receipt-print-area .border-gray-800 { border-color: #1f2937 !important; }
