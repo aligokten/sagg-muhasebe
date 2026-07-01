@@ -1,6 +1,6 @@
 {
   "name": "sagg-muhasebe-app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "homepage": ".",
   "description": "SAGG Muhasebe — ön muhasebe ve gelir/gider takip uygulaması",
@@ -10,6 +10,7 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "electron-updater": "^6.8.9",
     "firebase": "^10.12.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
@@ -61,7 +62,14 @@
     "extends": null,
     "appId": "com.sagg.muhasebe",
     "productName": "SAGG Muhasebe",
-    "publish": null,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "aligokten",
+        "repo": "sagg-muhasebe",
+        "releaseType": "release"
+      }
+    ],
     "directories": {
       "output": "release",
       "buildResources": "electron"

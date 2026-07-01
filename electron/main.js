@@ -1,8 +1,82 @@
 // --- SAGG Muhasebe masaüstü uygulaması (Electron ana süreç) ---
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 
 const isDev = !app.isPackaged;
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+
+function setupAutoUpdater(win) {
+  autoUpdater.on('update-available', async (info) => {
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Güncelleme mevcut',
+      message: `Yeni bir sürüm bulundu: v${info.version}`,
+      detail: 'Güncellemeyi şimdi indirmek ister misiniz?',
+      buttons: ['İndir', 'Daha Sonra'],
+      cancelId: 1,
+      defaultId: 0,
+    });
+    if (response === 0) autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on('update-downloaded', async (info) => {
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Güncelleme hazır',
+      message: `v${info.version} indirildi.`,
+      detail: 'Uygulamayı şimdi yeniden başlatıp kurmak ister misiniz?',
+      buttons: ['Şimdi Yeniden Başlat', 'Daha Sonra'],
+      cancelId: 1,
+      defaultId: 0,
+    });
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Güncelleme denetimi hatası:', err == null ? 'bilinmeyen hata' : (err.stack || err.message));
+    if (manualCheckPending) {
+      manualCheckPending = false;
+      dialog.showMessageBox(win, {
+        type: 'error',
+        title: 'Güncelleme kontrolü başarısız',
+        message: 'Güncellemeler kontrol edilirken bir hata oluştu. İnternet bağlantınızı kontrol edin.',
+      });
+    }
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    if (manualCheckPending) {
+      manualCheckPending = false;
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Güncel',
+        message: 'SAGG Muhasebe güncel sürümü kullanıyorsunuz.',
+      });
+    }
+  });
+}
+
+let manualCheckPending = false;
+
+function checkForUpdates(win, { manual } = {}) {
+  if (isDev) {
+    if (manual) {
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Geliştirme modu',
+        message: 'Güncelleme denetimi yalnızca paketlenmiş uygulamada çalışır.',
+      });
+    }
+    return;
+  }
+  if (manual) manualCheckPending = true;
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.error('Güncelleme kontrolü başarısız:', err);
+  });
+}
 
 // Aynı anda birden fazla pencere açılmasını engelle
 const gotLock = app.requestSingleInstanceLock();
@@ -18,7 +92,7 @@ if (!gotLock) {
   });
 }
 
-function buildMenu() {
+function buildMenu(win) {
   const template = [
     {
       label: 'Görünüm',
@@ -35,6 +109,11 @@ function buildMenu() {
     {
       label: 'Yardım',
       submenu: [
+        {
+          label: 'Güncellemeleri Kontrol Et',
+          click: () => checkForUpdates(win, { manual: true }),
+        },
+        { type: 'separator' },
         {
           label: 'SAGG Muhasebe Hakkında',
           click: () => shell.openExternal('https://aligokten.github.io/sagg-muhasebe/'),
@@ -71,11 +150,15 @@ function createWindow() {
   });
 
   win.once('ready-to-show', () => win.show());
+
+  return win;
 }
 
 app.whenReady().then(() => {
-  buildMenu();
-  createWindow();
+  const win = createWindow();
+  buildMenu(win);
+  setupAutoUpdater(win);
+  checkForUpdates(win);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

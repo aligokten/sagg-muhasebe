@@ -27,20 +27,7 @@ jobs:
         env:
           CI: false
 
-      - name: Build Windows installer
-        run: npx electron-builder --win
-
-      - name: Read package version
-        id: pkg
-        shell: bash
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: desktop-v${{ steps.pkg.outputs.version }}-${{ github.run_number }}
-          name: SAGG Muhasebe Masaüstü v${{ steps.pkg.outputs.version }}
-          body: Windows masaüstü uygulaması kurulum dosyası. "SAGG Muhasebe Setup ${{ steps.pkg.outputs.version }}.exe" dosyasını indirip çalıştırın.
-          files: |
-            release/*.exe
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & publish Windows installer
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
