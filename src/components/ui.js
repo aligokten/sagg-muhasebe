@@ -131,12 +131,12 @@ export const Field = ({ label, children, className = '' }) => (
 );
 
 const inputClass =
-  'p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none w-full bg-white';
+  'p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none w-full bg-white text-gray-900 placeholder-gray-400 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600 dark:placeholder-gray-400';
 
-export const Input = (props) => <input className={inputClass} {...props} />;
-export const Textarea = (props) => <textarea className={`${inputClass} h-24`} {...props} />;
-export const Select = ({ children, ...props }) => (
-  <select className={inputClass} {...props}>{children}</select>
+export const Input = ({ className = '', ...props }) => <input className={`${inputClass} ${className}`} {...props} />;
+export const Textarea = ({ className = '', ...props }) => <textarea className={`${inputClass} h-24 ${className}`} {...props} />;
+export const Select = ({ children, className = '', ...props }) => (
+  <select className={`${inputClass} ${className}`} {...props}>{children}</select>
 );
 
 // --- Modal ---
