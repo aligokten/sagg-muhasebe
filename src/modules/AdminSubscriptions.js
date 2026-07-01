@@ -4,11 +4,16 @@ import { CheckCircle, PauseCircle, RotateCcw, Save } from 'lucide-react';
 import {
   subscribeAllSubscriptions, updateSubscription, Timestamp,
   subscribeAllPaymentRequests, updatePaymentRequest, subscribePaymentInfo, setPaymentInfo,
+  subscribePricingPlans, setPricingPlans,
 } from '../firebase';
 import { formatDateShort, toDate } from '../utils';
+import { PLAN_OPTIONS } from '../constants';
 import {
   PageHeader, Card, Table, Td, Badge, EmptyState, FormModal, Field, Input, Select, Button,
 } from '../components/ui';
+
+const planLabel = (key) => PLAN_OPTIONS.find((p) => p.key === key)?.label || '-';
+const PLAN_DAYS = { '1m': 30, '3m': 90, '6m': 180, '12m': 365 };
 
 function PaymentInfoCard() {
   const [form, setForm] = useState({ bankName: '', accountHolder: '', iban: '', note: '' });
@@ -41,6 +46,43 @@ function PaymentInfoCard() {
   );
 }
 
+function PricingPlansCard() {
+  const [form, setForm] = useState({ '1m': '', '3m': '', '6m': '', '12m': '' });
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => subscribePricingPlans((d) => {
+    if (d) setForm({ '1m': d['1m'] || '', '3m': d['3m'] || '', '6m': d['6m'] || '', '12m': d['12m'] || '' });
+  }), []);
+
+  const save = async (e) => {
+    e.preventDefault();
+    await setPricingPlans({
+      '1m': Number(form['1m']) || 0,
+      '3m': Number(form['3m']) || 0,
+      '6m': Number(form['6m']) || 0,
+      '12m': Number(form['12m']) || 0,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <Card title="Abonelik Paketi Fiyatları" className="mb-6">
+      <form onSubmit={save} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {PLAN_OPTIONS.map((p) => (
+          <Field key={p.key} label={`${p.label} (₺)`}>
+            <Input type="number" step="0.01" value={form[p.key]} onChange={(e) => setForm({ ...form, [p.key]: e.target.value })} />
+          </Field>
+        ))}
+        <div className="md:col-span-2 flex items-center gap-3">
+          <Button type="submit" icon={Save}>Kaydet</Button>
+          {saved && <span className="text-sm text-green-600">Kaydedildi ✓</span>}
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 const STATUS_META = {
   trial: { label: 'Deneme', color: 'blue' },
   active: { label: 'Aktif', color: 'green' },
@@ -56,27 +98,20 @@ const statusOf = (sub) => {
   return sub.status || 'expired';
 };
 
-const DURATIONS = [
-  { k: '1m', l: '+1 Ay', days: 30 },
-  { k: '3m', l: '+3 Ay', days: 90 },
-  { k: '6m', l: '+6 Ay', days: 180 },
-  { k: '12m', l: '+1 Yıl', days: 365 },
-];
-
-function ActivateForm({ sub, onClose, onSaved }) {
-  const [duration, setDuration] = useState('1m');
+function ActivateForm({ sub, initialDuration, onClose, onSaved }) {
+  const [duration, setDuration] = useState(initialDuration || '1m');
   const [note, setNote] = useState(sub.note || '');
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
-    const days = DURATIONS.find((d) => d.k === duration).days;
+    const days = PLAN_DAYS[duration];
     const base = sub.status === 'active' && sub.expiresAt && toDate(sub.expiresAt).getTime() > Date.now()
       ? toDate(sub.expiresAt)
       : new Date();
     const expiresAt = Timestamp.fromDate(new Date(base.getTime() + days * 24 * 60 * 60 * 1000));
-    await updateSubscription(sub.id, { status: 'active', plan: 'aylik', expiresAt, note });
+    await updateSubscription(sub.id, { status: 'active', plan: duration, expiresAt, note });
     setBusy(false);
     onSaved && onSaved();
     onClose();
@@ -87,7 +122,7 @@ function ActivateForm({ sub, onClose, onSaved }) {
       <div className="space-y-3">
         <Field label="Süre">
           <Select value={duration} onChange={(e) => setDuration(e.target.value)}>
-            {DURATIONS.map((d) => <option key={d.k} value={d.k}>{d.l}</option>)}
+            {PLAN_OPTIONS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
           </Select>
         </Field>
         <Field label="Not (opsiyonel)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="örn. Havale ile ödendi 01.07.2026" /></Field>
@@ -102,6 +137,7 @@ export default function AdminSubscriptions() {
   const [requests, setRequests] = useState([]);
   const [activating, setActivating] = useState(null);
   const [activatingReqId, setActivatingReqId] = useState(null);
+  const [activatingDuration, setActivatingDuration] = useState(null);
 
   useEffect(() => subscribeAllSubscriptions(setSubs), []);
   useEffect(() => subscribeAllPaymentRequests(setRequests), []);
@@ -129,23 +165,25 @@ export default function AdminSubscriptions() {
     });
   };
 
-  const openActivate = (sub, reqId = null) => { setActivating(sub); setActivatingReqId(reqId); };
-  const closeActivate = () => { setActivating(null); setActivatingReqId(null); };
+  const openActivate = (sub, reqId = null, duration = null) => { setActivating(sub); setActivatingReqId(reqId); setActivatingDuration(duration); };
+  const closeActivate = () => { setActivating(null); setActivatingReqId(null); setActivatingDuration(null); };
   const dismissRequest = (req) => updatePaymentRequest(req.id, { status: 'handled' });
-  const activateFromRequest = (req) => openActivate(subs.find((s) => s.id === req.uid) || { id: req.uid, email: req.email }, req.id);
+  const activateFromRequest = (req) => openActivate(subs.find((s) => s.id === req.uid) || { id: req.uid, email: req.email }, req.id, req.plan);
 
   return (
     <div>
       <PageHeader title="Abonelikler" subtitle="Kullanıcı hesaplarını elle onaylayın, uzatın veya askıya alın" />
 
       <PaymentInfoCard />
+      <PricingPlansCard />
 
       {pendingRequests.length > 0 && (
         <Card title="Ödeme Talepleri" className="mb-6">
-          <Table headers={[{ label: 'E-posta' }, { label: 'Yöntem' }, { label: 'Tarih' }, { label: '' }]}>
+          <Table headers={[{ label: 'E-posta' }, { label: 'Paket' }, { label: 'Yöntem' }, { label: 'Tarih' }, { label: '' }]}>
             {pendingRequests.map((r) => (
               <tr key={r.id} className="hover:bg-gray-50">
                 <Td className="font-medium text-gray-900">{r.email}</Td>
+                <Td className="text-gray-500">{planLabel(r.plan)}</Td>
                 <Td><Badge color={r.method === 'havale' ? 'blue' : 'purple'}>{r.method === 'havale' ? 'Havale/EFT' : 'Kredi Kartı'}</Badge></Td>
                 <Td className="text-gray-500">{formatDateShort(r.createdAt)}</Td>
                 <Td align="right">
@@ -171,7 +209,7 @@ export default function AdminSubscriptions() {
                 <tr key={s.id} className="hover:bg-gray-50">
                   <Td className="font-medium text-gray-900">{s.email}</Td>
                   <Td><Badge color={meta.color}>{meta.label}</Badge></Td>
-                  <Td className="text-gray-500">{s.plan || '-'}</Td>
+                  <Td className="text-gray-500">{s.plan === 'trial' ? 'Deneme' : planLabel(s.plan)}</Td>
                   <Td className="text-gray-500">{dateVal ? formatDateShort(dateVal) : '-'}</Td>
                   <Td className="text-gray-400 text-xs max-w-[200px] truncate">{s.note || '-'}</Td>
                   <Td align="right">
@@ -190,6 +228,7 @@ export default function AdminSubscriptions() {
       {activating && (
         <ActivateForm
           sub={activating}
+          initialDuration={activatingDuration}
           onClose={closeActivate}
           onSaved={() => { if (activatingReqId) updatePaymentRequest(activatingReqId, { status: 'handled' }); }}
         />

@@ -5,6 +5,7 @@ import { setRecord, subscribeSubscription, ADMIN_EMAIL } from '../firebase';
 import { PageHeader, Card, Button, Field, Input, Textarea, Badge } from '../components/ui';
 import { downloadBackup, restoreBackup, countRecords, loadFromUid, writeLoaded } from '../backup';
 import { formatDateShort } from '../utils';
+import { PLAN_OPTIONS } from '../constants';
 import PaymentOptions from '../components/PaymentOptions';
 
 const SUB_STATUS_META = {
@@ -136,7 +137,7 @@ export default function Settings({ userId, userEmail, companyProfile, data = {} 
             <div className="flex items-center gap-3">
               <Badge color={(SUB_STATUS_META[sub?.status]?.color) || 'gray'}>{SUB_STATUS_META[sub?.status]?.label || 'Bilinmiyor'}</Badge>
               <p className="text-sm text-gray-500">
-                {sub?.status === 'active' && sub.expiresAt && <>Bitiş tarihi: <b>{formatDateShort(sub.expiresAt)}</b></>}
+                {sub?.status === 'active' && sub.expiresAt && <>{PLAN_OPTIONS.find((p) => p.key === sub.plan)?.label} · Bitiş tarihi: <b>{formatDateShort(sub.expiresAt)}</b></>}
                 {sub?.status === 'trial' && sub.trialEndsAt && <>Deneme süresi bitişi: <b>{formatDateShort(sub.trialEndsAt)}</b></>}
               </p>
             </div>

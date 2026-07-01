@@ -120,9 +120,9 @@ export const updateSubscription = (uid, data) =>
 // --- Ödeme talepleri (müşterinin "ödedim" bildirimi) ---
 const paymentRequestsColRef = () => collection(db, `artifacts/${appId}/paymentRequests`);
 
-export const createPaymentRequest = (uid, email, method, note) =>
+export const createPaymentRequest = (uid, email, method, note, plan) =>
   addDoc(paymentRequestsColRef(), {
-    uid, email, method, note: note || '', status: 'pending', createdAt: Timestamp.now(),
+    uid, email, method, note: note || '', plan: plan || null, status: 'pending', createdAt: Timestamp.now(),
   });
 
 export const subscribeAllPaymentRequests = (cb) =>
@@ -142,3 +142,11 @@ export const subscribePaymentInfo = (cb) =>
   onSnapshot(paymentInfoDocRef(), (snap) => cb(snap.exists() ? snap.data() : null));
 
 export const setPaymentInfo = (data) => setDoc(paymentInfoDocRef(), data);
+
+// --- Abonelik paketi fiyatları (yönetici tarafından girilir) ---
+const pricingPlansDocRef = () => doc(db, `artifacts/${appId}/appConfig`, 'pricingPlans');
+
+export const subscribePricingPlans = (cb) =>
+  onSnapshot(pricingPlansDocRef(), (snap) => cb(snap.exists() ? snap.data() : null));
+
+export const setPricingPlans = (data) => setDoc(pricingPlansDocRef(), data);
