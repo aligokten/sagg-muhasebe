@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Edit, Trash2, TrendingUp, TrendingDown, Receipt as ReceiptIcon } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
-import { formatCurrency, formatDateShort, todayInput, sum, vatFromGross, nextReceiptNo } from '../utils';
+import { formatCurrency, formatDateShort, todayInput, toInputDate, sum, vatFromGross, nextReceiptNo } from '../utils';
 import {
   PageHeader, AddButton, Card, Table, Td, EmptyState, StatCard,
   FormModal, ConfirmDialog, Field, Input, Select,
@@ -10,10 +10,19 @@ import {
 import { CategorySelect } from '../categories';
 import ReceiptView from '../components/ReceiptView';
 
-function EntryForm({ kind, existing, existingList, userId, accounts, customers, projects, onClose, onCreated }) {
+export function EntryForm({ kind, existing, existingList, userId, accounts, customers, projects, onClose, onCreated }) {
   const isIncome = kind === 'incomes';
   const [form, setForm] = useState(
-    existing || { date: todayInput(), category: '', description: '', amount: '', vatRate: 20, accountId: accounts[0]?.id || '', customerId: '', projectId: '' }
+    existing
+      ? {
+          ...existing,
+          date: toInputDate(existing.date),
+          category: existing.category || '',
+          accountId: existing.accountId || '',
+          customerId: existing.customerId || '',
+          projectId: existing.projectId || '',
+        }
+      : { date: todayInput(), category: '', description: '', amount: '', vatRate: 20, accountId: accounts[0]?.id || '', customerId: '', projectId: '' }
   );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const customerProjects = projects.filter((p) => p.customerId === form.customerId);
