@@ -190,37 +190,39 @@ export default function Settings({ userId, userEmail, companyProfile, data = {} 
         <Button icon={Save} onClick={save}>Kaydet</Button>
       </div>
 
-      <Card title="Veri Yedekleme / Taşıma" className="mb-6">
-        <div className="p-6">
-          <p className="text-sm text-gray-500 mb-4">
-            Tüm verilerinizi (<b>{countRecords(data)}</b> kayıt) bir JSON dosyasına yedekleyebilir veya başka bir
-            hesaba/cihaza taşımak için geri yükleyebilirsiniz.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button icon={Download} variant="secondary" onClick={() => downloadBackup(data)}>Yedek Al (JSON indir)</Button>
-            <Button icon={Upload} onClick={() => fileRef.current?.click()} disabled={restoring}>
-              {restoring ? 'Yükleniyor...' : 'Yedeği Geri Yükle'}
-            </Button>
-            <input ref={fileRef} type="file" accept="application/json,.json" onChange={handleRestore} className="hidden" />
-          </div>
-          <div className="mt-5 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
-            <p className="font-medium text-gray-600">Başka bir hesaba taşıma:</p>
-            <p>1) Kaynak hesapla giriş yapmışken <b>Yedek Al</b> ile dosyayı indirin.</p>
-            <p>2) Çıkış yapıp hedef hesaba <b>Giriş Yap</b>.</p>
-            <p>3) Bu sayfada <b>Yedeği Geri Yükle</b> ile indirdiğiniz dosyayı seçin. Verileriniz hesaba taşınır ve tüm cihazlara senkron olur.</p>
-          </div>
-        </div>
-      </Card>
+      {isAdmin && (
+        <>
+          <Card title="Veri Yedekleme / Taşıma" className="mb-6">
+            <div className="p-6">
+              <p className="text-sm text-gray-500 mb-4">
+                Tüm verilerinizi (<b>{countRecords(data)}</b> kayıt) bir JSON dosyasına yedekleyebilir veya başka bir
+                hesaba/cihaza taşımak için geri yükleyebilirsiniz.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button icon={Download} variant="secondary" onClick={() => downloadBackup(data)}>Yedek Al (JSON indir)</Button>
+                <Button icon={Upload} onClick={() => fileRef.current?.click()} disabled={restoring}>
+                  {restoring ? 'Yükleniyor...' : 'Yedeği Geri Yükle'}
+                </Button>
+                <input ref={fileRef} type="file" accept="application/json,.json" onChange={handleRestore} className="hidden" />
+              </div>
+              <div className="mt-5 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
+                <p className="font-medium text-gray-600">Başka bir hesaba taşıma:</p>
+                <p>1) Kaynak hesapla giriş yapmışken <b>Yedek Al</b> ile dosyayı indirin.</p>
+                <p>2) Çıkış yapıp hedef hesaba <b>Giriş Yap</b>.</p>
+                <p>3) Bu sayfada <b>Yedeği Geri Yükle</b> ile indirdiğiniz dosyayı seçin. Verileriniz hesaba taşınır ve tüm cihazlara senkron olur.</p>
+              </div>
+            </div>
+          </Card>
 
-      <Card title="Eski Hesaptan Veri Kurtarma / Taşıma" className="mb-6">
-        <div className="p-6">
-          <p className="text-sm text-gray-500 mb-2">
-            Yanlışlıkla yeni bir hesaba geçtiyseniz, eski hesabınızdaki verileri buradan bu hesaba taşıyabilirsiniz.
-          </p>
-          <div className="text-xs text-gray-500 bg-amber-50 rounded-lg p-3 mb-4 space-y-1">
-            <p className="font-medium text-amber-700">Önce Firestore kuralını GEÇİCİ olarak gevşetin:</p>
-            <p>Firebase Console → Firestore Database → Rules → aşağıdakini yapıştırıp Publish edin:</p>
-            <pre className="bg-white border rounded p-2 mt-1 overflow-x-auto text-[11px] leading-snug">{`rules_version = '2';
+          <Card title="Eski Hesaptan Veri Kurtarma / Taşıma" className="mb-6">
+            <div className="p-6">
+              <p className="text-sm text-gray-500 mb-2">
+                Yanlışlıkla yeni bir hesaba geçtiyseniz, eski hesabınızdaki verileri buradan bu hesaba taşıyabilirsiniz.
+              </p>
+              <div className="text-xs text-gray-500 bg-amber-50 rounded-lg p-3 mb-4 space-y-1">
+                <p className="font-medium text-amber-700">Önce Firestore kuralını GEÇİCİ olarak gevşetin:</p>
+                <p>Firebase Console → Firestore Database → Rules → aşağıdakini yapıştırıp Publish edin:</p>
+                <pre className="bg-white border rounded p-2 mt-1 overflow-x-auto text-[11px] leading-snug">{`rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /artifacts/{appId}/users/{userId}/{document=**} {
@@ -229,16 +231,18 @@ service cloud.firestore {
     }
   }
 }`}</pre>
-            <p className="mt-1">Taşıma bittikten sonra <b>read</b> satırını eski haline (<code>request.auth.uid == userId</code>) geri alın.</p>
-          </div>
-          <p className="text-xs text-gray-500 mb-1">Eski Kullanıcı ID (Firebase Console → Authentication → Users → eski hesabın UID'i):</p>
-          <div className="flex flex-wrap gap-3 items-center">
-            <Input value={sourceUid} onChange={(e) => setSourceUid(e.target.value)} placeholder="örn. a2hwft1BjdOGKiBXp4HsRz0LVTu1" className="flex-1 min-w-[240px]" />
-            <Button icon={Upload} onClick={handleMigrate} disabled={migrating}>{migrating ? 'Taşınıyor...' : 'Veriyi Taşı'}</Button>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-2">Şu anki hesabınızın UID'i: <code className="break-all">{userId}</code></p>
-        </div>
-      </Card>
+                <p className="mt-1">Taşıma bittikten sonra <b>read</b> satırını eski haline (<code>request.auth.uid == userId</code>) geri alın.</p>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Eski Kullanıcı ID (Firebase Console → Authentication → Users → eski hesabın UID'i):</p>
+              <div className="flex flex-wrap gap-3 items-center">
+                <Input value={sourceUid} onChange={(e) => setSourceUid(e.target.value)} placeholder="örn. a2hwft1BjdOGKiBXp4HsRz0LVTu1" className="flex-1 min-w-[240px]" />
+                <Button icon={Upload} onClick={handleMigrate} disabled={migrating}>{migrating ? 'Taşınıyor...' : 'Veriyi Taşı'}</Button>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2">Şu anki hesabınızın UID'i: <code className="break-all">{userId}</code></p>
+            </div>
+          </Card>
+        </>
+      )}
 
       {paymentOpen && <PaymentOptions userId={userId} userEmail={userEmail} onClose={() => setPaymentOpen(false)} />}
     </div>
