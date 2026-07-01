@@ -38,43 +38,43 @@ const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, account
       <div className="flex justify-between items-start pb-2 border-b border-gray-800">
         <div style={{ maxWidth: '68%' }}>
           {companyProfile?.logo && <img src={companyProfile.logo} alt="" style={{ maxHeight: 34, maxWidth: 130, objectFit: 'contain' }} className="mb-1" />}
-          <p className="font-bold text-[11px] leading-tight">{companyProfile?.companyName || 'İşletme Adı'}</p>
-          {companyProfile?.address && <p className="text-[8px] text-gray-600 leading-tight whitespace-pre-line">{companyProfile.address}</p>}
-          {companyProfile?.taxId && <p className="text-[8px] text-gray-600">VKN/TCKN: {companyProfile.taxId}</p>}
-          {companyProfile?.phone && <p className="text-[8px] text-gray-600">Tel: {companyProfile.phone}</p>}
+          <p className="font-bold text-[14px] leading-tight">{companyProfile?.companyName || 'İşletme Adı'}</p>
+          {companyProfile?.address && <p className="text-[10px] text-gray-600 leading-tight whitespace-pre-line">{companyProfile.address}</p>}
+          {companyProfile?.taxId && <p className="text-[10px] text-gray-600">VKN/TCKN: {companyProfile.taxId}</p>}
+          {companyProfile?.phone && <p className="text-[10px] text-gray-600">Tel: {companyProfile.phone}</p>}
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="font-bold text-[12px] whitespace-nowrap">{title}</p>
-          <p className="text-[9px] mt-1">Seri No: <span className="font-semibold">{record.receiptNo || '-'}</span></p>
-          <p className="text-[9px]">Tarih: {formatDate(record.date)}</p>
+          <p className="font-bold text-[15px] whitespace-nowrap">{title}</p>
+          <p className="text-[11px] mt-1">Seri No: <span className="font-semibold">{record.receiptNo || '-'}</span></p>
+          <p className="text-[11px]">Tarih: {formatDate(record.date)}</p>
         </div>
       </div>
 
-      <div className="mt-2 py-1 text-center bg-gray-100 text-[8px] font-semibold tracking-wider">{copyLabel}</div>
+      <div className="mt-2 py-1 text-center bg-gray-100 text-[10px] font-semibold tracking-wider">{copyLabel}</div>
 
       <div className="mt-3 flex-1 flex flex-col border border-gray-300 rounded p-3">
-        <div className="text-[9px] space-y-1.5">
+        <div className="text-[11px] space-y-1.5">
           <p><span className="text-gray-500">Sayın:</span> <span className="font-semibold">{partyName}</span></p>
           <p className="text-gray-600 leading-snug">
             Aşağıda cins ve tutarı belirtilen bedel {paymentLabel(accounts, record.accountId)} yoluyla {verb}.
           </p>
         </div>
 
-        <div className="mt-3 border border-gray-400 rounded p-2 text-[9px] space-y-1">
+        <div className="mt-3 border border-gray-400 rounded p-2 text-[11px] space-y-1">
           <p><span className="text-gray-500">Açıklama:</span> {record.description || record.category || '-'}</p>
           <p><span className="text-gray-500">Tutar (Rakam):</span> <span className="font-bold">{formatCurrency(record.amount)}</span></p>
           <p><span className="text-gray-500">Tutar (Yazı):</span> {numberToWordsTr(record.amount)}</p>
         </div>
 
-        <div className="mt-3 text-[8px] text-gray-400">
+        <div className="mt-1.5 text-[10px] text-gray-400">
           Not:
-          <div className="border-b border-gray-300 mt-3" />
-          <div className="border-b border-gray-300 mt-4" />
+          <div className="border-b border-gray-300 mt-1.5" />
+          <div className="border-b border-gray-300 mt-2" />
         </div>
 
         <div className="mt-auto pt-3 flex items-start gap-3">
           {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: 68, height: 68, flexShrink: 0 }} />}
-          <div className="flex-1 grid grid-cols-2 gap-2 text-center text-[8px]">
+          <div className="flex-1 grid grid-cols-2 gap-2 text-center text-[10px]">
             <div>
               <div style={{ height: 44 }} />
               <div className="border-t border-gray-500 pt-1 leading-tight">{leftSign}<br />İmza / Kaşe</div>
@@ -87,7 +87,7 @@ const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, account
         </div>
       </div>
 
-      <div className="mt-2 pt-2 text-center text-[7px] text-gray-400 border-t border-gray-200">
+      <div className="mt-2 pt-2 text-center text-[9px] text-gray-400 border-t border-gray-200">
         Bu makbuz SAGG Muhasebe ile elektronik ortamda düzenlenmiştir.
       </div>
     </div>
