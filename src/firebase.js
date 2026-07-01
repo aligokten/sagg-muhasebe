@@ -1,9 +1,9 @@
 // --- Firebase yapılandırması ve veri katmanı ---
 import { initializeApp } from 'firebase/app';
 import {
-  getAuth, signInAnonymously, onAuthStateChanged,
+  getAuth, onAuthStateChanged,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, EmailAuthProvider, linkWithCredential,
+  signOut,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -37,9 +37,9 @@ export const db = getFirestore(app);
 export const appId = 'sagg-muhasebe-app';
 
 export {
-  signInAnonymously, onAuthStateChanged, Timestamp,
+  onAuthStateChanged, Timestamp,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, EmailAuthProvider, linkWithCredential,
+  signOut,
 };
 
 // --- Yol yardımcıları ---
@@ -88,3 +88,31 @@ export const subscribeDoc = (userId, name, id, cb, onMissing) =>
     if (snap.exists()) cb(snap.data());
     else if (onMissing) onMissing();
   });
+
+// --- Abonelik yönetimi (kullanıcı bazlı ayrı üst-seviye koleksiyon) ---
+export const ADMIN_EMAIL = 'aligokten99@gmail.com';
+
+const subscriptionDocRef = (uid) => doc(db, `artifacts/${appId}/subscriptions`, uid);
+const subscriptionsColRef = () => collection(db, `artifacts/${appId}/subscriptions`);
+
+export const createTrialSubscription = (uid, email) =>
+  setDoc(subscriptionDocRef(uid), {
+    email,
+    status: 'trial',
+    plan: 'trial',
+    trialEndsAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+    createdAt: Timestamp.now(),
+  });
+
+export const subscribeSubscription = (uid, cb) =>
+  onSnapshot(subscriptionDocRef(uid), (snap) => cb(snap.exists() ? snap.data() : null));
+
+export const subscribeAllSubscriptions = (cb) =>
+  onSnapshot(
+    subscriptionsColRef(),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.error('abonelikler okunurken hata:', err)
+  );
+
+export const updateSubscription = (uid, data) =>
+  updateDoc(subscriptionDocRef(uid), { ...data, updatedAt: Timestamp.now() });

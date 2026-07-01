@@ -2,18 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
-  TrendingUp, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff, ListChecks, Calculator,
-  HardHat, FileBarChart,
+  TrendingUp, X, DraftingCompass, LogOut, Cloud, ListChecks, Calculator,
+  HardHat, FileBarChart, ShieldCheck, Lock,
 } from 'lucide-react';
 
 import {
-  auth, signInAnonymously, onAuthStateChanged, signOut,
+  auth, onAuthStateChanged, signOut,
   subscribeCollection, subscribeDoc, setRecord,
+  subscribeSubscription, createTrialSubscription, ADMIN_EMAIL,
 } from './firebase';
 import { Spinner } from './components/ui';
+import { toDate } from './utils';
 import AuthModal from './components/AuthModal';
 import Topbar from './components/Topbar';
 import { COLLECTIONS } from './constants';
+import AdminSubscriptions from './modules/AdminSubscriptions';
 
 import Dashboard from './modules/Dashboard';
 import Customers from './modules/Customers';
@@ -87,7 +90,7 @@ const NAV_GROUPS = [
   },
 ];
 
-const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, onLogout, logo, mobileOpen, setMobileOpen, onOpenCalc }) => (
+const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAdmin, onLogout, logo, mobileOpen, setMobileOpen, onOpenCalc }) => (
   <>
     {mobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
     <nav className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-gray-800 text-white flex flex-col no-print transform transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -131,29 +134,31 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, 
             </ul>
           </div>
         ))}
+        {isAdmin && (
+          <div className="mb-3">
+            <p className="px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Yönetim</p>
+            <ul>
+              <li className="px-2">
+                <button
+                  onClick={() => { setCurrentPage('admin'); setMobileOpen(false); }}
+                  className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === 'admin' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                >
+                  <ShieldCheck className="h-5 w-5 flex-shrink-0" />
+                  <span className="ml-3 font-medium">Abonelikler</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        )}
       </div>
       <div className="p-3 border-t border-gray-700">
-        {isAnonymous ? (
-          <>
-            <div className="flex items-center gap-2 text-xs text-amber-300 mb-2">
-              <CloudOff size={14} /> Misafir (yalnız bu cihaz)
-            </div>
-            <button onClick={onAuth} className="flex items-center justify-center gap-2 w-full bg-orange-600 hover:bg-orange-700 text-white rounded-lg py-2 text-sm font-medium">
-              <LogIn size={15} /> Giriş / Kayıt Ol
-            </button>
-            <p className="text-[11px] text-gray-500 mt-2">Çok cihazdan erişim için hesap oluşturun.</p>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-2 text-xs text-emerald-300 mb-1">
-              <Cloud size={14} /> Senkronize
-            </div>
-            <p className="text-xs text-gray-300 break-all mb-2">{userEmail}</p>
-            <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg py-2 text-sm font-medium">
-              <LogOut size={15} /> Çıkış Yap
-            </button>
-          </>
-        )}
+        <div className="flex items-center gap-2 text-xs text-emerald-300 mb-1">
+          <Cloud size={14} /> Senkronize
+        </div>
+        <p className="text-xs text-gray-300 break-all mb-2">{userEmail}</p>
+        <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg py-2 text-sm font-medium">
+          <LogOut size={15} /> Çıkış Yap
+        </button>
       </div>
     </nav>
   </>
@@ -162,10 +167,10 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAnonymous, onAuth, 
 export default function App() {
   const [userId, setUserId] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
-  const [isAnonymous, setIsAnonymous] = useState(true);
-  const [authOpen, setAuthOpen] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState(null);
+  const [sub, setSub] = useState(null);
+  const [subLoaded, setSubLoaded] = useState(false);
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -203,31 +208,53 @@ export default function App() {
       loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
     ]).then(() => setScriptsLoaded(true)).catch((e) => console.error('PDF kütüphaneleri yüklenemedi', e));
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user && !user.isAnonymous) {
         setUserId(user.uid);
         setUserEmail(user.email);
-        setIsAnonymous(user.isAnonymous);
       } else {
-        try {
-          await signInAnonymously(auth);
-        } catch (error) {
-          if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
-            setAuthError("Firebase projenizde kimlik doğrulama yapılandırılmamış. Lütfen Firebase konsolundan Authentication > Sign-in method sekmesine gidip 'Anonymous' sağlayıcısını etkinleştirin.");
-          } else {
-            setAuthError('Kimlik doğrulanırken bir hata oluştu: ' + error.message);
-          }
-          setLoading(false);
-        }
+        if (user) signOut(auth).catch((e) => console.error(e)); // eski misafir oturumu: zorunlu çıkış
+        setUserId(null);
+        setUserEmail(null);
       }
+      setAuthChecked(true);
     });
     return () => unsub();
   }, []);
 
   const handleLogout = async () => {
-    if (!window.confirm('Çıkış yapılsın mı? Bu cihaz tekrar misafir moduna döner; verilerinize yeniden giriş yaparak ulaşırsınız.')) return;
+    if (!window.confirm('Çıkış yapılsın mı?')) return;
     try { await signOut(auth); } catch (e) { console.error(e); }
   };
+
+  // Abonelik durumunu dinle (yönetici hesabı hariç)
+  const isAdmin = userEmail === ADMIN_EMAIL;
+  useEffect(() => {
+    if (!userId || isAdmin) { setSub(null); setSubLoaded(true); return; }
+    setSubLoaded(false);
+    const unsub = subscribeSubscription(userId, (d) => { setSub(d); setSubLoaded(true); });
+    return () => unsub();
+  }, [userId, isAdmin]);
+
+  // Kayıt sırasında deneme kaydı oluşturulamamışsa (örn. Firestore kuralı henüz
+  // yayınlanmamışsa), bir sonraki girişte kendiliğinden telafi eder.
+  const trialHealRef = useRef(null);
+  useEffect(() => {
+    if (!userId || isAdmin || !subLoaded || sub || trialHealRef.current === userId) return;
+    trialHealRef.current = userId;
+    createTrialSubscription(userId, userEmail).catch((e) => console.error('Deneme kaydı oluşturulamadı:', e));
+  }, [userId, userEmail, isAdmin, subLoaded, sub]);
+
+  const entitlement = (() => {
+    if (isAdmin) return 'active';
+    if (!subLoaded) return 'pending';
+    if (!sub) return 'none';
+    const now = Date.now();
+    if (sub.status === 'active') return sub.expiresAt && toDate(sub.expiresAt) < now ? 'expired' : 'active';
+    if (sub.status === 'trial') return sub.trialEndsAt && toDate(sub.trialEndsAt) < now ? 'trial-expired' : 'active';
+    if (sub.status === 'suspended') return 'suspended';
+    return 'expired';
+  })();
 
   // Tüm koleksiyonları ve şirket profilini dinle
   useEffect(() => {
@@ -264,27 +291,23 @@ export default function App() {
     });
   }, [userId, data]);
 
-  if (authError) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-red-50 text-red-900 p-8">
-        <div className="text-center max-w-2xl">
-          <AlertTriangle className="mx-auto h-12 w-12 text-red-400" />
-          <h2 className="mt-4 text-2xl font-bold">Yapılandırma Hatası</h2>
-          <p className="mt-2">{authError}</p>
-          <p className="mt-4 text-sm text-red-700">Bu ayarı yaptıktan sonra sayfayı yenilemeniz gerekmektedir.</p>
-        </div>
-      </div>
-    );
+  if (!authChecked || (userId && (!subLoaded || loading))) {
+    return <div className="flex items-center justify-center h-screen bg-gray-100"><Spinner /></div>;
   }
 
-  if (loading || !userId) {
-    return <div className="flex items-center justify-center h-screen bg-gray-100"><Spinner /></div>;
+  if (!userId) {
+    return <AuthModal />;
+  }
+
+  if (!isAdmin && entitlement !== 'active') {
+    return <SubscriptionLocked entitlement={entitlement} onLogout={handleLogout} />;
   }
 
   const fullData = { ...data, scriptsLoaded };
 
   const renderPage = () => {
     switch (currentPage) {
+      case 'admin': return <AdminSubscriptions />;
       case 'invoices': return <Invoices data={fullData} userId={userId} />;
       case 'quotes': return <Quotes data={fullData} userId={userId} />;
       case 'orders': return <Orders data={fullData} userId={userId} />;
@@ -313,8 +336,7 @@ export default function App() {
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         userEmail={userEmail}
-        isAnonymous={isAnonymous}
-        onAuth={() => setAuthOpen(true)}
+        isAdmin={isAdmin}
         onLogout={handleLogout}
         logo={data.companyProfile?.logo}
         mobileOpen={mobileOpen}
@@ -327,8 +349,6 @@ export default function App() {
           setPage={setCurrentPage}
           onOpenMobile={() => setMobileOpen(true)}
           userEmail={userEmail}
-          isAnonymous={isAnonymous}
-          onAuth={() => setAuthOpen(true)}
           onLogout={handleLogout}
           dark={dark}
           toggleDark={toggleDark}
@@ -338,8 +358,30 @@ export default function App() {
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
       </div>
-      {authOpen && <AuthModal isAnonymous={isAnonymous} onClose={() => setAuthOpen(false)} />}
       <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
+    </div>
+  );
+}
+
+const LOCK_MESSAGES = {
+  'trial-expired': '7 günlük ücretsiz deneme süreniz sona erdi.',
+  expired: 'Aboneliğinizin süresi doldu.',
+  suspended: 'Hesabınız askıya alınmış.',
+  none: 'Hesabınız için bir abonelik kaydı bulunamadı.',
+};
+
+function SubscriptionLocked({ entitlement, onLogout }) {
+  return (
+    <div className="flex items-center justify-center h-screen bg-gray-100 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
+        <Lock className="mx-auto h-10 w-10 text-orange-500 mb-3" />
+        <h2 className="text-lg font-bold text-gray-800 mb-2">Erişim Kısıtlı</h2>
+        <p className="text-sm text-gray-600 mb-1">{LOCK_MESSAGES[entitlement] || LOCK_MESSAGES.none}</p>
+        <p className="text-sm text-gray-500 mb-6">Devam etmek için hesabınızı yöneten kişiyle iletişime geçin.</p>
+        <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full bg-gray-700 hover:bg-gray-800 text-white rounded-lg py-2 text-sm font-medium mx-auto">
+          <LogOut size={15} /> Çıkış Yap
+        </button>
+      </div>
     </div>
   );
 }
