@@ -19,6 +19,7 @@ import {
   getDocs,
   getDoc,
 } from 'firebase/firestore';
+import { COLLECTIONS } from './constants';
 
 // Bu bilgiler Firebase projesinden alınmıştır.
 const firebaseConfig = {
@@ -116,6 +117,19 @@ export const subscribeAllSubscriptions = (cb) =>
 
 export const updateSubscription = (uid, data) =>
   updateDoc(subscriptionDocRef(uid), { ...data, updatedAt: Timestamp.now() });
+
+// Süresi dolan bir kullanıcının TÜM iş verilerini kalıcı olarak siler
+// (yönetici onayıyla, bkz. AdminSubscriptions.js "Silinmeye Hazır Hesaplar").
+export const purgeExpiredUser = async (uid) => {
+  await Promise.all(
+    COLLECTIONS.map(async (name) => {
+      const snap = await getDocs(colRef(uid, name));
+      await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+    })
+  );
+  await deleteDoc(docRef(uid, 'companyProfile', 'main')).catch(() => {});
+  await updateSubscription(uid, { status: 'deleted', deletedAt: Timestamp.now() });
+};
 
 // --- Ödeme talepleri (müşterinin "ödedim" bildirimi) ---
 const paymentRequestsColRef = () => collection(db, `artifacts/${appId}/paymentRequests`);

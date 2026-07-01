@@ -1,10 +1,10 @@
 // --- Yönetici: kullanıcı aboneliklerini elle onaylama/uzatma ---
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, PauseCircle, RotateCcw, Save } from 'lucide-react';
+import { CheckCircle, PauseCircle, RotateCcw, Save, Trash2, Mail } from 'lucide-react';
 import {
   subscribeAllSubscriptions, updateSubscription, Timestamp,
   subscribeAllPaymentRequests, updatePaymentRequest, subscribePaymentInfo, setPaymentInfo,
-  subscribePricingPlans, setPricingPlans,
+  subscribePricingPlans, setPricingPlans, purgeExpiredUser,
 } from '../firebase';
 import { formatDateShort, toDate } from '../utils';
 import { PLAN_OPTIONS } from '../constants';
@@ -14,6 +14,20 @@ import {
 
 const planLabel = (key) => PLAN_OPTIONS.find((p) => p.key === key)?.label || '-';
 const PLAN_DAYS = { '1m': 30, '3m': 90, '6m': 180, '12m': 365 };
+const GRACE_MS = 90 * 24 * 60 * 60 * 1000; // aboneliği yenilenmeyen hesaplar için 3 aylık saklama süresi
+
+// Süresi dolmuş (ve henüz yenilenmemiş) bir aboneliğin ne zaman doldu ve
+// 3 aylık saklama süresinin dolup dolmadığını hesaplar. Halen aktif/deneme
+// süresi devam eden veya askıya alınmış/silinmiş hesaplar için null döner.
+function expiryInfo(sub) {
+  if (!sub || sub.status === 'deleted' || sub.status === 'suspended') return null;
+  const raw = sub.status === 'active' ? sub.expiresAt : sub.status === 'trial' ? sub.trialEndsAt : null;
+  if (!raw) return null;
+  const expiredAt = toDate(raw).getTime();
+  if (expiredAt >= Date.now()) return null;
+  const deadline = expiredAt + GRACE_MS;
+  return { expiredAt, deadline, overdue: Date.now() > deadline };
+}
 
 function PaymentInfoCard() {
   const [form, setForm] = useState({ bankName: '', accountHolder: '', iban: '', note: '' });
@@ -88,6 +102,7 @@ const STATUS_META = {
   active: { label: 'Aktif', color: 'green' },
   expired: { label: 'Süresi Doldu', color: 'red' },
   suspended: { label: 'Askıda', color: 'yellow' },
+  deleted: { label: 'Silindi', color: 'gray' },
 };
 
 const statusOf = (sub) => {
@@ -152,6 +167,28 @@ export default function AdminSubscriptions() {
     [requests]
   );
 
+  const lapsed = useMemo(
+    () => rows
+      .map((s) => ({ sub: s, info: expiryInfo(s) }))
+      .filter((x) => x.info)
+      .sort((a, b) => a.info.expiredAt - b.info.expiredAt),
+    [rows]
+  );
+  const needsReminder = lapsed.filter((x) => !x.info.overdue);
+  const readyToDelete = lapsed.filter((x) => x.info.overdue);
+
+  const [purgingId, setPurgingId] = useState(null);
+  const purgeUser = async (sub) => {
+    if (!window.confirm(`${sub.email} hesabının TÜM iş verileri (faturalar, cariler, kasa hareketleri, stoklar, her şey) KALICI OLARAK silinecek. Bu işlem GERİ ALINAMAZ. Devam edilsin mi?`)) return;
+    if (!window.confirm('Son onay: verileri şimdi kalıcı olarak sileyim mi?')) return;
+    setPurgingId(sub.id);
+    try {
+      await purgeExpiredUser(sub.id);
+    } finally {
+      setPurgingId(null);
+    }
+  };
+
   const suspend = (sub) => {
     if (!window.confirm(`${sub.email} hesabı askıya alınsın mı?`)) return;
     updateSubscription(sub.id, { status: 'suspended' });
@@ -191,6 +228,46 @@ export default function AdminSubscriptions() {
                     <Button variant="secondary" onClick={() => dismissRequest(r)}>Kapat</Button>
                     <Button icon={CheckCircle} onClick={() => activateFromRequest(r)}>Aktifleştir</Button>
                   </div>
+                </Td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      )}
+
+      {needsReminder.length > 0 && (
+        <Card title="Hatırlatma Bekleyen Hesaplar" className="mb-6">
+          <p className="px-6 pt-4 text-xs text-gray-500">Aboneliği süresi dolmuş, henüz 3 aylık saklama süresi dolmamış hesaplar. Yenileme hatırlatması için kendileriyle iletişime geçin.</p>
+          <Table headers={[{ label: 'E-posta' }, { label: 'Süresi Doldu' }, { label: 'Silinmeye Kalan Süre' }, { label: '' }]}>
+            {needsReminder.map(({ sub: s, info }) => (
+              <tr key={s.id} className="hover:bg-gray-50">
+                <Td className="font-medium text-gray-900">{s.email}</Td>
+                <Td className="text-gray-500">{formatDateShort(info.expiredAt)}</Td>
+                <Td className="text-gray-500">{formatDateShort(info.deadline)}</Td>
+                <Td align="right">
+                  <div className="flex justify-end gap-2">
+                    <a href={`mailto:${s.email}`} title="E-posta gönder" className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><Mail size={16} /></a>
+                    <Button icon={CheckCircle} onClick={() => openActivate(s)}>Aktifleştir</Button>
+                  </div>
+                </Td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      )}
+
+      {readyToDelete.length > 0 && (
+        <Card title="Silinmeye Hazır Hesaplar (3 ay doldu)" className="mb-6">
+          <p className="px-6 pt-4 text-xs text-red-600">Bu hesapların 3 aylık saklama süresi doldu. "Kalıcı Olarak Sil" verilerini geri alınamaz şekilde siler.</p>
+          <Table headers={[{ label: 'E-posta' }, { label: 'Süresi Doldu' }, { label: '' }]}>
+            {readyToDelete.map(({ sub: s, info }) => (
+              <tr key={s.id} className="hover:bg-gray-50">
+                <Td className="font-medium text-gray-900">{s.email}</Td>
+                <Td className="text-gray-500">{formatDateShort(info.expiredAt)}</Td>
+                <Td align="right">
+                  <Button variant="danger" icon={Trash2} disabled={purgingId === s.id} onClick={() => purgeUser(s)}>
+                    {purgingId === s.id ? 'Siliniyor...' : 'Kalıcı Olarak Sil'}
+                  </Button>
                 </Td>
               </tr>
             ))}
