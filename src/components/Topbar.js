@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Menu, Search, Calendar, Bell, Mail, Settings as SettingsIcon, LogOut,
   Sun, Moon, Users, Package, Receipt, AlertTriangle, ScrollText, CalendarClock, FileBarChart,
-  User, UserRound, Smile, Cat, Crown,
+  User, UserRound, Smile, Cat, Crown, CreditCard,
 } from 'lucide-react';
 import { allProductStocks } from '../finance';
 import { toDate, formatDateShort, daysBetween } from '../utils';
@@ -22,7 +22,7 @@ const Pop = ({ children, onClose, width = 'w-80' }) => (
 
 const iconBtn = 'relative flex items-center justify-center w-10 h-10 rounded-full glass text-gray-600 dark:text-gray-200 hover:opacity-90';
 
-export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogout, dark, toggleDark, logo, avatar = 'user', setAvatar }) {
+export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogout, dark, toggleDark, logo, avatar = 'user', setAvatar, pendingPaymentRequests = 0 }) {
   const { customers = [], products = [], invoices = [], reminders = [], checks = [], zReports = [] } = data;
   const [open, setOpen] = useState(null); // 'cal' | 'bell' | 'profile' | null
   const [q, setQ] = useState('');
@@ -62,8 +62,9 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
     let lastSeen = '';
     try { lastSeen = localStorage.getItem('sagg-zreport-lastseen') || ''; } catch { /* yoksay */ }
     if (latestReport && latestReport > lastSeen) list.push({ icon: FileBarChart, color: 'text-sky-600', label: `${latestReport.split('-').reverse().join('.')} Z raporu hazır`, page: 'zreport' });
+    if (pendingPaymentRequests > 0) list.push({ icon: CreditCard, color: 'text-orange-600', label: `${pendingPaymentRequests} bekleyen ödeme bildirimi`, page: 'admin' });
     return list;
-  }, [invoices, reminders, products, checks, stocks, zReports]);
+  }, [invoices, reminders, products, checks, stocks, zReports, pendingPaymentRequests]);
 
   // Takvim: yaklaşan hatırlatıcı + çek vadeleri
   const upcoming = useMemo(() => {
