@@ -1,7 +1,7 @@
 // --- Üst bar: arama, takvim, bildirim, profil (glassmorphism açılır menüler) ---
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
-  Menu, Search, Calendar, Bell, Mail, Settings as SettingsIcon, LogIn, LogOut,
+  Menu, Search, Calendar, Bell, Mail, Settings as SettingsIcon, LogOut,
   Sun, Moon, Users, Package, Receipt, AlertTriangle, ScrollText, CalendarClock, FileBarChart,
   User, UserRound, Smile, Cat, Crown,
 } from 'lucide-react';
@@ -22,7 +22,7 @@ const Pop = ({ children, onClose, width = 'w-80' }) => (
 
 const iconBtn = 'relative flex items-center justify-center w-10 h-10 rounded-full glass text-gray-600 dark:text-gray-200 hover:opacity-90';
 
-export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnonymous, onAuth, onLogout, dark, toggleDark, logo, avatar = 'user', setAvatar }) {
+export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogout, dark, toggleDark, logo, avatar = 'user', setAvatar }) {
   const { customers = [], products = [], invoices = [], reminders = [], checks = [], zReports = [] } = data;
   const [open, setOpen] = useState(null); // 'cal' | 'bell' | 'profile' | null
   const [q, setQ] = useState('');
@@ -164,8 +164,8 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnony
         {open === 'profile' && (
           <Pop onClose={() => setOpen(null)} width="w-64">
             <div className="px-3 py-2 border-b border-white/30 dark:border-white/10 mb-1">
-              <p className="text-sm font-semibold truncate">{isAnonymous ? 'Misafir' : userEmail}</p>
-              <p className="text-xs text-gray-400">{isAnonymous ? 'Yalnız bu cihaz' : 'Senkronize hesap'}</p>
+              <p className="text-sm font-semibold truncate">{userEmail}</p>
+              <p className="text-xs text-gray-400">Senkronize hesap</p>
             </div>
             {setAvatar && (
               <div className="px-3 py-2 border-b border-white/30 dark:border-white/10 mb-1">
@@ -186,11 +186,7 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnony
             )}
             <button onClick={() => go('settings')} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm"><SettingsIcon size={16} />Ayarlar</button>
             <button onClick={() => { toggleDark(); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm">{dark ? <Sun size={16} /> : <Moon size={16} />}{dark ? 'Açık Mod' : 'Koyu Mod'}</button>
-            {isAnonymous ? (
-              <button onClick={() => { onAuth(); setOpen(null); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm text-orange-600"><LogIn size={16} />Giriş / Kayıt Ol</button>
-            ) : (
-              <button onClick={() => { onLogout(); setOpen(null); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm text-rose-600"><LogOut size={16} />Çıkış Yap</button>
-            )}
+            <button onClick={() => { onLogout(); setOpen(null); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm text-rose-600"><LogOut size={16} />Çıkış Yap</button>
           </Pop>
         )}
       </div>

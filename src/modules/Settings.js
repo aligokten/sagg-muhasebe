@@ -171,9 +171,9 @@ export default function Settings({ userId, companyProfile, data = {} }) {
             <input ref={fileRef} type="file" accept="application/json,.json" onChange={handleRestore} className="hidden" />
           </div>
           <div className="mt-5 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
-            <p className="font-medium text-gray-600">Misafir verilerini hesaba taşıma:</p>
-            <p>1) Misafir (giriş yapmadan) haldeyken <b>Yedek Al</b> ile dosyayı indirin.</p>
-            <p>2) Sol menüden hesabınıza <b>Giriş Yap</b>.</p>
+            <p className="font-medium text-gray-600">Başka bir hesaba taşıma:</p>
+            <p>1) Kaynak hesapla giriş yapmışken <b>Yedek Al</b> ile dosyayı indirin.</p>
+            <p>2) Çıkış yapıp hedef hesaba <b>Giriş Yap</b>.</p>
             <p>3) Bu sayfada <b>Yedeği Geri Yükle</b> ile indirdiğiniz dosyayı seçin. Verileriniz hesaba taşınır ve tüm cihazlara senkron olur.</p>
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function Settings({ userId, companyProfile, data = {} }) {
       <Card title="Eski Hesaptan Veri Kurtarma / Taşıma" className="mb-6">
         <div className="p-6">
           <p className="text-sm text-gray-500 mb-2">
-            Yanlışlıkla yeni bir hesaba geçtiyseniz, eski (misafir) hesabınızdaki verileri buradan bu hesaba taşıyabilirsiniz.
+            Yanlışlıkla yeni bir hesaba geçtiyseniz, eski hesabınızdaki verileri buradan bu hesaba taşıyabilirsiniz.
           </p>
           <div className="text-xs text-gray-500 bg-amber-50 rounded-lg p-3 mb-4 space-y-1">
             <p className="font-medium text-amber-700">Önce Firestore kuralını GEÇİCİ olarak gevşetin:</p>
@@ -198,7 +198,7 @@ service cloud.firestore {
 }`}</pre>
             <p className="mt-1">Taşıma bittikten sonra <b>read</b> satırını eski haline (<code>request.auth.uid == userId</code>) geri alın.</p>
           </div>
-          <p className="text-xs text-gray-500 mb-1">Eski Kullanıcı ID (Firebase Console → Authentication → Users → anonim kullanıcının UID'i):</p>
+          <p className="text-xs text-gray-500 mb-1">Eski Kullanıcı ID (Firebase Console → Authentication → Users → eski hesabın UID'i):</p>
           <div className="flex flex-wrap gap-3 items-center">
             <Input value={sourceUid} onChange={(e) => setSourceUid(e.target.value)} placeholder="örn. a2hwft1BjdOGKiBXp4HsRz0LVTu1" className="flex-1 min-w-[240px]" />
             <Button icon={Upload} onClick={handleMigrate} disabled={migrating}>{migrating ? 'Taşınıyor...' : 'Veriyi Taşı'}</Button>
