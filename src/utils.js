@@ -81,6 +81,10 @@ export const nextDocNumber = (records, prefix, field = 'docNumber') => {
   return `${prefix}${year}${String(max + 1).padStart(6, '0')}`;
 };
 
+// Tahsilat/ödeme makbuzu seri numarası üretir (örn. TH2026000001 / OD2026000001)
+export const nextReceiptNo = (records, kind) =>
+  nextDocNumber(records, kind === 'incomes' ? 'TH' : 'OD', 'receiptNo');
+
 // Sayıyı Türkçe yazıya çevirir (fatura "yalnız" alanı için)
 export function numberToWordsTr(num) {
   if (num === null || num === undefined) return '';
