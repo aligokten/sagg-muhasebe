@@ -1,6 +1,6 @@
 {
   "name": "sagg-muhasebe-app",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "homepage": ".",
   "description": "SAGG Muhasebe — ön muhasebe ve gelir/gider takip uygulaması",
