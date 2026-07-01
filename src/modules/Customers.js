@@ -21,6 +21,16 @@ import { TRADES } from './Contractors';
 import { EntryForm as IncomeExpenseForm } from './CashFlow';
 import { CategorySelect } from '../categories';
 
+export const ROLE_OPTIONS = [
+  { value: 'customer', label: 'Müşteri' },
+  { value: 'supplier', label: 'Tedarikçi' },
+  { value: 'both', label: 'Müşteri + Tedarikçi' },
+  { value: 'kiraci', label: 'Kiracı' },
+  { value: 'malsahibi', label: 'Mal Sahibi' },
+  { value: 'apartman', label: 'İşyeri / Apartman Yönetimi' },
+];
+const roleLabel = (role) => ROLE_OPTIONS.find((r) => r.value === role)?.label || 'Müşteri';
+
 // İş/proje türleri (her biri ayrı ikonla temsil edilir)
 const JOB_TYPES = [
   { key: 'proje', label: 'Proje', icon: FolderKanban },
@@ -103,7 +113,7 @@ function CustomerForm({ existing, userId, onClose }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Ünvan / Ad Soyad" className="md:col-span-2"><Input name="name" value={form.name} onChange={set} required /></Field>
         <Field label="Tip"><Select name="accountType" value={form.accountType} onChange={set}><option>Tüzel Kişi</option><option>Şahıs</option></Select></Field>
-        <Field label="Cari Rolü"><Select name="role" value={form.role} onChange={set}><option value="customer">Müşteri</option><option value="supplier">Tedarikçi</option><option value="both">Müşteri + Tedarikçi</option></Select></Field>
+        <Field label="Cari Rolü"><Select name="role" value={form.role} onChange={set}>{ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</Select></Field>
         {form.accountType === 'Tüzel Kişi' ? (
           <>
             <Field label="Vergi Dairesi"><Input name="taxOffice" value={form.taxOffice} onChange={set} /></Field>
@@ -946,7 +956,7 @@ export default function Customers({ data, userId }) {
             {filtered.map((c) => (
               <tr key={c.id} className="hover:bg-gray-50">
                 <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setSelected(c)}>{c.name}</Td>
-                <Td className="text-gray-500">{c.role === 'supplier' ? 'Tedarikçi' : c.role === 'both' ? 'Müşteri+Tedarikçi' : 'Müşteri'}</Td>
+                <Td className="text-gray-500">{roleLabel(c.role)}</Td>
                 <Td className="text-gray-500">{c.taxId || c.tcNo || '-'}</Td>
                 <Td className="text-gray-500">{c.phone || '-'}</Td>
                 <Td align="right">{balanceBadge(balances[c.id] || 0)}</Td>
