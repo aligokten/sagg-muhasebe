@@ -12,11 +12,11 @@ import {
   subscribeSubscription, createTrialSubscription, subscribeAllPaymentRequests, ADMIN_EMAIL,
 } from './firebase';
 import { Spinner } from './components/ui';
-import { toDate } from './utils';
+import { toDate, daysBetween } from './utils';
 import AuthModal from './components/AuthModal';
 import PaymentOptions from './components/PaymentOptions';
 import Topbar from './components/Topbar';
-import { COLLECTIONS } from './constants';
+import { COLLECTIONS, RENEWAL_REMINDER_DAYS } from './constants';
 import AdminSubscriptions from './modules/AdminSubscriptions';
 
 import Dashboard from './modules/Dashboard';
@@ -264,6 +264,16 @@ export default function App() {
     return subscribeAllPaymentRequests(setPaymentRequests);
   }, [isAdmin]);
 
+  // Ücretli aboneliği süresi dolmak üzere olan kullanıcı için yenileme hatırlatması
+  // (pakete göre belirlenen gün sayılarında, bildirim çanında gösterilir).
+  const renewalReminderDays = (() => {
+    if (isAdmin || !sub || sub.status !== 'active' || !sub.expiresAt) return null;
+    const daysLeft = daysBetween(new Date(), toDate(sub.expiresAt));
+    if (daysLeft < 0) return null;
+    const schedule = RENEWAL_REMINDER_DAYS[sub.plan];
+    return schedule && schedule.includes(daysLeft) ? daysLeft : null;
+  })();
+
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   // Tüm koleksiyonları ve şirket profilini dinle
@@ -371,6 +381,7 @@ export default function App() {
           avatar={avatar}
           setAvatar={pickAvatar}
           pendingPaymentRequests={isAdmin ? paymentRequests.filter((r) => r.status === 'pending').length : 0}
+          renewalReminderDays={renewalReminderDays}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
       </div>
