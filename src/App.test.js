@@ -1,5 +1,6 @@
 import { numberToWordsTr, computeTotals, vatFromGross } from './utils';
-import { cariMovements, accountMovements, productStock } from './finance';
+import { cariMovements, accountMovements, productStock, contractorPaid, contractorRemaining } from './finance';
+import { buildZReport, getMissingReportDates, dateKey } from './zreport';
 
 test('numberToWordsTr para tutarını yazıya çevirir', () => {
   expect(numberToWordsTr(0)).toBe('Sıfır Türk Lirası');
@@ -85,4 +86,46 @@ test('productStock alış ve satışları hesaba katar', () => {
     stockMovements: [],
   };
   expect(productStock('p1', data)).toBe(12);
+});
+
+test('contractorPaid/Remaining müellif hesaplarından bağımsız çalışır', () => {
+  const data = {
+    contractorAssignments: [{ id: 'ca1', agreedAmount: 1000 }],
+    transactions: [
+      { contractorAssignmentId: 'ca1', amount: 300 },
+      { subcontractId: 'sc1', amount: 9999 }, // müellif ödemesi, karışmamalı
+    ],
+  };
+  expect(contractorPaid('ca1', data)).toBe(300);
+  expect(contractorRemaining(data.contractorAssignments[0], data)).toBe(700);
+});
+
+test('buildZReport gün içindeki hareketleri açılış/kapanış bakiyesiyle özetler', () => {
+  const data = {
+    accounts: [{ id: 'a1', name: 'Kasa', type: 'Nakit', openingBalance: 0 }],
+    transactions: [
+      { accountId: 'a1', type: 'tahsilat', direction: 'in', amount: 500, date: new Date(2026, 5, 30, 10) }, // önceki gün
+      { accountId: 'a1', type: 'tahsilat', direction: 'in', amount: 200, date: new Date(2026, 6, 1, 9) },
+      { accountId: 'a1', type: 'odeme', direction: 'out', amount: 50, date: new Date(2026, 6, 1, 18) },
+    ],
+    expenses: [], incomes: [],
+  };
+  const report = buildZReport('2026-07-01', data);
+  expect(report.accounts[0].openingBalance).toBe(500);
+  expect(report.accounts[0].totalIn).toBe(200);
+  expect(report.accounts[0].totalOut).toBe(50);
+  expect(report.accounts[0].closingBalance).toBe(650);
+  expect(report.totals.closingBalance).toBe(650);
+});
+
+test('getMissingReportDates son rapordan sonraki günleri, dünle sınırlı olacak şekilde döner', () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  const existing = [{ id: dateKey(threeDaysAgo) }];
+  const missing = getMissingReportDates(existing);
+  expect(missing).not.toContain(dateKey(threeDaysAgo));
+  expect(missing[missing.length - 1]).toBe(dateKey(yesterday));
+  expect(missing.length).toBe(2); // threeDaysAgo+1 ve threeDaysAgo+2 = 2 gün, dünle biter
 });
