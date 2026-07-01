@@ -159,6 +159,27 @@ export const authorTotals = (authorId, data) => {
   return { agreed, paid, remaining: agreed - paid };
 };
 
+// --- Taşeron (müellifden ayrı tutulan) hesaplamaları ---
+// Bir taşeron yetkilendirmesine (contractorAssignment) yapılan toplam ödeme.
+export const contractorPaid = (assignmentId, data) =>
+  (data.transactions || [])
+    .filter((t) => t.contractorAssignmentId === assignmentId)
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+// Bir taşeron yetkilendirmesinin kalan borcu = sözleşme bedeli - ödenen.
+export const contractorRemaining = (ca, data) =>
+  (Number(ca.agreedAmount) || 0) - contractorPaid(ca.id, data);
+
+// Bir taşeronun tüm işlerdeki toplam sözleşme / ödenen / kalan tutarı.
+export const contractorTotals = (contractorId, data) => {
+  const assignments = (data.contractorAssignments || []).filter((c) => c.contractorId === contractorId);
+  const agreed = assignments.reduce((s, x) => s + (Number(x.agreedAmount) || 0), 0);
+  const paid = (data.transactions || [])
+    .filter((t) => t.contractorId === contractorId)
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  return { agreed, paid, remaining: agreed - paid };
+};
+
 // Bir kasa/banka hesabının hareketleri ve bakiyesi.
 export const accountMovements = (accountId, data) => {
   const { accounts = [], transactions = [], expenses = [], incomes = [] } = data;

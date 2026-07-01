@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Menu, Search, Calendar, Bell, Mail, Settings as SettingsIcon, LogIn, LogOut,
-  Sun, Moon, Users, Package, Receipt, AlertTriangle, ScrollText, CalendarClock,
+  Sun, Moon, Users, Package, Receipt, AlertTriangle, ScrollText, CalendarClock, FileBarChart,
   User, UserRound, Smile, Cat, Crown,
 } from 'lucide-react';
 import { allProductStocks } from '../finance';
@@ -23,7 +23,7 @@ const Pop = ({ children, onClose, width = 'w-80' }) => (
 const iconBtn = 'relative flex items-center justify-center w-10 h-10 rounded-full glass text-gray-600 dark:text-gray-200 hover:opacity-90';
 
 export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnonymous, onAuth, onLogout, dark, toggleDark, logo, avatar = 'user', setAvatar }) {
-  const { customers = [], products = [], invoices = [], reminders = [], checks = [] } = data;
+  const { customers = [], products = [], invoices = [], reminders = [], checks = [], zReports = [] } = data;
   const [open, setOpen] = useState(null); // 'cal' | 'bell' | 'profile' | null
   const [q, setQ] = useState('');
   const searchRef = useRef(null);
@@ -58,8 +58,12 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, isAnony
     if (low) list.push({ icon: AlertTriangle, color: 'text-rose-600', label: `${low} ürün kritik stokta`, page: 'products' });
     const dueChecks = checks.filter((c) => c.status === 'portfolio' && daysBetween(new Date(), c.dueDate) <= 7).length;
     if (dueChecks) list.push({ icon: ScrollText, color: 'text-orange-600', label: `${dueChecks} çek/senet vadesi yakın`, page: 'checks' });
+    const latestReport = zReports.reduce((max, r) => (r.id > max ? r.id : max), '');
+    let lastSeen = '';
+    try { lastSeen = localStorage.getItem('sagg-zreport-lastseen') || ''; } catch { /* yoksay */ }
+    if (latestReport && latestReport > lastSeen) list.push({ icon: FileBarChart, color: 'text-sky-600', label: `${latestReport.split('-').reverse().join('.')} Z raporu hazır`, page: 'zreport' });
     return list;
-  }, [invoices, reminders, products, checks, stocks]);
+  }, [invoices, reminders, products, checks, stocks, zReports]);
 
   // Takvim: yaklaşan hatırlatıcı + çek vadeleri
   const upcoming = useMemo(() => {

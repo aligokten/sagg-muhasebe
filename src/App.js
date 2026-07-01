@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
   TrendingUp, X, AlertTriangle, DraftingCompass, LogIn, LogOut, Cloud, CloudOff, ListChecks, Calculator,
+  HardHat, FileBarChart,
 } from 'lucide-react';
 
 import {
@@ -17,6 +18,7 @@ import { COLLECTIONS } from './constants';
 import Dashboard from './modules/Dashboard';
 import Customers from './modules/Customers';
 import Authors from './modules/Authors';
+import Contractors from './modules/Contractors';
 import Products from './modules/Products';
 import Invoices from './modules/Invoices';
 import Quotes from './modules/Quotes';
@@ -30,8 +32,10 @@ import Reports from './modules/Reports';
 import Agenda from './modules/Agenda';
 import Settings from './modules/Settings';
 import AllTransactions from './modules/AllTransactions';
+import ZReport from './modules/ZReport';
 import { CalculatorModal } from './components/DashboardGadgets';
 import ArsaPaylastir from './ArsaPaylastir';
+import { buildZReport, getMissingReportDates } from './zreport';
 
 const EMPTY_DATA = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
 
@@ -57,6 +61,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'customers', label: 'Cari Hesaplar', icon: Users },
       { id: 'authors', label: 'Müellifler', icon: DraftingCompass },
+      { id: 'contractors', label: 'Taşeronlar', icon: HardHat },
       { id: 'products', label: 'Stok / Ürünler', icon: Package },
       { id: 'personnel', label: 'Personel', icon: UserCog },
     ],
@@ -68,6 +73,7 @@ const NAV_GROUPS = [
       { id: 'checks', label: 'Çek & Senet', icon: ScrollText },
       { id: 'cashflow', label: 'Gelir & Gider', icon: TrendingUp },
       { id: 'activity', label: 'Tüm İşlemler', icon: ListChecks },
+      { id: 'zreport', label: 'Z Raporu', icon: FileBarChart },
     ],
   },
   {
@@ -246,6 +252,18 @@ export default function App() {
     return () => unsubs.forEach((u) => u && u());
   }, [userId]);
 
+  // Z Raporu: uygulama açıldığında, henüz raporu oluşturulmamış geçmiş
+  // günler için otomatik olarak gün sonu dökümü üretir (bkz. src/zreport.js).
+  const zReportRanRef = useRef(null);
+  useEffect(() => {
+    if (!userId || zReportRanRef.current === userId) return;
+    if (!data.accounts || data.accounts.length === 0) return;
+    zReportRanRef.current = userId;
+    getMissingReportDates(data.zReports || []).forEach((dateStr) => {
+      setRecord(userId, 'zReports', dateStr, buildZReport(dateStr, data));
+    });
+  }, [userId, data]);
+
   if (authError) {
     return (
       <div className="flex items-center justify-center h-screen bg-red-50 text-red-900 p-8">
@@ -273,12 +291,14 @@ export default function App() {
       case 'waybills': return <Waybills data={fullData} userId={userId} />;
       case 'customers': return <Customers data={fullData} userId={userId} />;
       case 'authors': return <Authors data={fullData} userId={userId} />;
+      case 'contractors': return <Contractors data={fullData} userId={userId} />;
       case 'products': return <Products data={fullData} userId={userId} />;
       case 'personnel': return <Personnel data={fullData} userId={userId} />;
       case 'accounts': return <Accounts data={fullData} userId={userId} />;
       case 'checks': return <Checks data={fullData} userId={userId} />;
       case 'cashflow': return <CashFlow data={fullData} userId={userId} />;
       case 'activity': return <AllTransactions data={fullData} userId={userId} />;
+      case 'zreport': return <ZReport data={fullData} />;
       case 'reports': return <Reports data={fullData} />;
       case 'agenda': return <Agenda data={fullData} userId={userId} />;
       case 'arsapay': return <ArsaPaylastir />;

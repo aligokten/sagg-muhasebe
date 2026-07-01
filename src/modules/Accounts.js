@@ -1,6 +1,6 @@
 // --- Kasa & Banka Hesapları + hareketler + virman ---
 import React, { useState, useMemo } from 'react';
-import { Edit, Trash2, Landmark, ArrowLeft, ArrowLeftRight, Wallet } from 'lucide-react';
+import { Edit, Trash2, Landmark, ArrowLeft, ArrowLeftRight, Wallet, CreditCard, Store, Banknote } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput } from '../utils';
 import { accountMovements, allAccountBalances } from '../finance';
@@ -9,8 +9,26 @@ import {
   FormModal, ConfirmDialog, Button, Field, Input, Select,
 } from '../components/ui';
 
+// Kasa/Banka hesapları 4 sabit başlık altında gruplanır. Eski kayıtlarla
+// (Banka/Nakit Kasa) uyumluluk için normalizeAccountType eşlik eder.
+const ACCOUNT_TYPES = [
+  { key: 'Kredi Kartı', label: 'Kredi Kartı', icon: CreditCard, hint: 'Hangi kartla ödeme yapıldığını takip edin' },
+  { key: 'POS', label: 'POS', icon: Store, hint: 'Cihaz bazlı tahsilatlarınızı ayırın' },
+  { key: 'Mevduat Hesabı', label: 'Mevduat Hesabı', icon: Landmark, hint: 'Havale/EFT giriş-çıkışlarınızın hesabı' },
+  { key: 'Nakit', label: 'Nakit', icon: Banknote, hint: 'Elden yapılan tahsilat/ödemeler' },
+];
+export const normalizeAccountType = (type) => {
+  if (type === 'Banka') return 'Mevduat Hesabı';
+  if (type === 'Nakit Kasa') return 'Nakit';
+  return ACCOUNT_TYPES.some((t) => t.key === type) ? type : 'Mevduat Hesabı';
+};
+
 function AccountForm({ existing, userId, onClose }) {
-  const [form, setForm] = useState(existing || { name: '', type: 'Banka', iban: '', openingBalance: 0 });
+  const [form, setForm] = useState(
+    existing
+      ? { ...existing, type: normalizeAccountType(existing.type) }
+      : { name: '', type: 'Mevduat Hesabı', iban: '', openingBalance: 0 }
+  );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const submit = async (e) => {
     e.preventDefault();
@@ -24,9 +42,9 @@ function AccountForm({ existing, userId, onClose }) {
   return (
     <FormModal title={existing ? 'Hesap Düzenle' : 'Yeni Kasa / Banka'} onSubmit={submit} onClose={onClose}>
       <div className="grid grid-cols-1 gap-4">
-        <Field label="Hesap Adı"><Input name="name" value={form.name} onChange={set} required placeholder="örn. İş Bankası TL" /></Field>
-        <Field label="Tür"><Select name="type" value={form.type} onChange={set}><option>Banka</option><option>Nakit Kasa</option><option>Kredi Kartı</option><option>POS</option></Select></Field>
-        <Field label="IBAN"><Input name="iban" value={form.iban} onChange={set} /></Field>
+        <Field label="Hesap Adı"><Input name="name" value={form.name} onChange={set} required placeholder="örn. Garanti Bonus Kart / İş Bankası TL" /></Field>
+        <Field label="Tür"><Select name="type" value={form.type} onChange={set}>{ACCOUNT_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</Select></Field>
+        <Field label="IBAN / Hesap No"><Input name="iban" value={form.iban} onChange={set} /></Field>
         <Field label="Açılış Bakiyesi"><Input type="number" step="0.01" name="openingBalance" value={form.openingBalance} onChange={set} /></Field>
       </div>
     </FormModal>
@@ -94,7 +112,7 @@ function AccountDetail({ account, data, userId, onBack }) {
       <div className="flex justify-between items-start mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">{account.name}</h1>
-          <p className="text-sm text-gray-500 mt-1">{account.type} · {account.iban || '-'}</p>
+          <p className="text-sm text-gray-500 mt-1">{normalizeAccountType(account.type)} · {account.iban || '-'}</p>
         </div>
         <Button icon={Wallet} onClick={() => setMoveOpen(true)}>Para Giriş/Çıkış</Button>
       </div>
@@ -152,26 +170,42 @@ export default function Accounts({ data, userId }) {
         <StatCard title="Toplam Bakiye" value={formatCurrency(total)} color={total >= 0 ? 'text-green-600' : 'text-red-600'} />
       </div>
 
-      <Card>
-        {accounts.length === 0 ? <EmptyState message="Henüz kasa/banka hesabı yok" /> : (
-          <Table headers={[{ label: 'Hesap Adı' }, { label: 'Tür' }, { label: 'IBAN' }, { label: 'Bakiye', align: 'right' }, { label: '' }]}>
-            {accounts.map((a) => (
-              <tr key={a.id} className="hover:bg-gray-50">
-                <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setSelected(a)}>{a.name}</Td>
-                <Td className="text-gray-500">{a.type}</Td>
-                <Td className="text-gray-500">{a.iban || '-'}</Td>
-                <Td align="right" className={`font-semibold ${(balances[a.id] || 0) >= 0 ? 'text-gray-800' : 'text-red-600'}`}>{formatCurrency(balances[a.id] || 0)}</Td>
-                <Td align="right">
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => { setEditing(a); setFormOpen(true); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><Edit size={16} /></button>
-                    <button onClick={() => setConfirmId(a.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
-                  </div>
-                </Td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Card>
+      {accounts.length === 0 ? (
+        <Card><EmptyState message="Henüz kasa/banka hesabı yok" /></Card>
+      ) : (
+        ACCOUNT_TYPES.map((t) => {
+          const group = accounts.filter((a) => normalizeAccountType(a.type) === t.key);
+          const groupTotal = group.reduce((s, a) => s + (balances[a.id] || 0), 0);
+          return (
+            <Card
+              key={t.key}
+              className="mb-5"
+              title={<span className="flex items-center gap-2"><t.icon size={17} className="text-orange-600" />{t.label}</span>}
+              actions={<span className="text-sm text-gray-500">{group.length > 0 && <>Toplam: <b className={groupTotal >= 0 ? 'text-gray-800' : 'text-red-600'}>{formatCurrency(groupTotal)}</b></>}</span>}
+            >
+              {group.length === 0 ? (
+                <p className="text-sm text-gray-400 px-6 py-5">{t.hint}. Bu türde henüz hesap eklenmedi.</p>
+              ) : (
+                <Table headers={[{ label: 'Hesap Adı' }, { label: 'IBAN / Hesap No' }, { label: 'Bakiye', align: 'right' }, { label: '' }]}>
+                  {group.map((a) => (
+                    <tr key={a.id} className="hover:bg-gray-50">
+                      <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setSelected(a)}>{a.name}</Td>
+                      <Td className="text-gray-500">{a.iban || '-'}</Td>
+                      <Td align="right" className={`font-semibold ${(balances[a.id] || 0) >= 0 ? 'text-gray-800' : 'text-red-600'}`}>{formatCurrency(balances[a.id] || 0)}</Td>
+                      <Td align="right">
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => { setEditing(a); setFormOpen(true); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><Edit size={16} /></button>
+                          <button onClick={() => setConfirmId(a.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
+                        </div>
+                      </Td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+            </Card>
+          );
+        })
+      )}
 
       {formOpen && <AccountForm existing={editing} userId={userId} onClose={() => { setFormOpen(false); setEditing(null); }} />}
       {transferOpen && <TransferForm accounts={accounts} userId={userId} onClose={() => setTransferOpen(false)} />}

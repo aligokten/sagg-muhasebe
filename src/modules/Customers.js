@@ -2,18 +2,22 @@
 import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote,
-  FolderKanban, HardHat, AudioLines, ListChecks,
+  FolderKanban, HardHat, AudioLines, ListChecks, Link2, Unlink,
 } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
-import { formatCurrency, formatDateShort, todayInput, toInputDate } from '../utils';
+import { formatCurrency, formatDateShort, todayInput, toInputDate, toDate } from '../utils';
 import { downloadExcel } from '../exportExcel';
-import { cariMovements, allCariBalances, customerProjectBalances, subcontractPaid, subcontractRemaining } from '../finance';
+import {
+  cariMovements, allCariBalances,
+  subcontractPaid, subcontractRemaining, contractorPaid, contractorRemaining,
+} from '../finance';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
   FormModal, ConfirmDialog, Button, Field, Input, Select, Textarea, ActionMenu,
 } from '../components/ui';
 import QuickEntry from '../components/QuickEntry';
 import { BRANCHES } from './Authors';
+import { TRADES } from './Contractors';
 import { CategorySelect } from '../categories';
 
 // İş/proje türleri (her biri ayrı ikonla temsil edilir)
@@ -24,6 +28,16 @@ const JOB_TYPES = [
   { key: 'takip', label: 'İş Takibi', icon: ListChecks },
 ];
 const jobTypeMeta = (key) => JOB_TYPES.find((j) => j.key === key) || JOB_TYPES[0];
+
+// Bir cariye ait işler: sahibi olduğu işler + tedarikçi olarak bağlandığı mevcut işler
+const getCustomerProjects = (customerId, data) => {
+  const owned = (data.projects || []).filter((p) => p.customerId === customerId);
+  const linkedIds = (data.projectLinks || []).filter((l) => l.customerId === customerId).map((l) => l.projectId);
+  const linked = (data.projects || [])
+    .filter((p) => linkedIds.includes(p.id) && p.customerId !== customerId)
+    .map((p) => ({ ...p, _linked: true }));
+  return [...owned, ...linked];
+};
 
 const balanceBadge = (bal) => {
   if (Math.abs(bal) < 0.01) return <Badge color="gray">Bakiye Yok</Badge>;
@@ -154,6 +168,62 @@ function ProjectForm({ customerId, existing, userId, onClose }) {
   );
 }
 
+// --- Tedarikçi için "Yeni İş": mevcut inşaat işleri arasından seçim + "Diğer İş" ---
+// Aynı işin farklı carilerde ayrı ayrı (ve hataya açık şekilde) tekrar girilmesini
+// önlemek için tedarikçi, projeyi yeniden oluşturmaz; var olan projeye bağlanır.
+function JobLinkForm({ customer, data, userId, onClose, onOtherJob }) {
+  const [selectedId, setSelectedId] = useState('');
+  const already = new Set(getCustomerProjects(customer.id, data).map((p) => p.id));
+  const options = (data.projects || [])
+    .filter((p) => p.jobType === 'insaat' && !already.has(p.id))
+    .map((p) => ({ ...p, _owner: (data.customers || []).find((c) => c.id === p.customerId)?.name || '' }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!selectedId) return alert('Bir iş seçin.');
+    try {
+      await addRecord(userId, 'projectLinks', { projectId: selectedId, customerId: customer.id });
+      onClose();
+    } catch (err) { console.error(err); alert('Bağlantı kaydedilemedi.'); }
+  };
+
+  return (
+    <FormModal title={`${customer.name} — Yeni İş`} onSubmit={submit} onClose={onClose} submitLabel="Bu İşe Bağla">
+      <p className="text-sm text-gray-500 mb-3">
+        Tedarikçi kayıtlarında aynı iş yeniden oluşturulmaz; mevcut inşaat işlerinden birine bağlanır.
+        Böylece tüm cariler aynı işin tek kaydı üzerinden senkron takip edilir. Listede olmayan bir iş için <b>Diğer İş</b> seçeneğini kullanın.
+      </p>
+      {options.length === 0 ? (
+        <p className="text-sm text-gray-400 bg-gray-50 rounded-lg p-4 text-center">Bağlanabilecek kayıtlı bir inşaat işi yok.</p>
+      ) : (
+        <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+          {options.map((p) => (
+            <button
+              type="button"
+              key={p.id}
+              onClick={() => setSelectedId(p.id)}
+              className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-left transition-colors ${selectedId === p.id ? 'bg-orange-50 border-orange-400' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+            >
+              <HardHat size={17} className="text-orange-600 flex-shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-gray-800 truncate">{p.name}</span>
+                <span className="block text-xs text-gray-400 truncate">{p._owner}{p.address ? ` · ${p.address}` : ''}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => { onOtherJob(); onClose(); }}
+        className="flex items-center gap-2 w-full px-3 py-2.5 mt-3 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50 text-sm"
+      >
+        <PlusCircle size={16} />Diğer İş (listede yok, yeni iş oluştur)
+      </button>
+    </FormModal>
+  );
+}
+
 // --- Tahsilat / Ödeme formu (opsiyonel iş/proje seçimli) ---
 function PaymentForm({ type, customer, userId, accounts, projects, lockedProjectId, onClose }) {
   const isCollect = type === 'tahsilat';
@@ -222,7 +292,7 @@ function SubcontractForm({ project, authors, userId, onClose }) {
   if (authors.length === 0) {
     return (
       <FormModal title="Müellif Ata" onSubmit={(e) => { e.preventDefault(); onClose(); }} onClose={onClose} submitLabel="Kapat">
-        <p className="text-gray-600 text-sm">Önce <b>Müellifler</b> menüsünden mühendis/taşeron ekleyin, sonra buradan projeye atayabilirsiniz.</p>
+        <p className="text-gray-600 text-sm">Önce <b>Müellifler</b> menüsünden mühendis ekleyin, sonra buradan projeye atayabilirsiniz.</p>
       </FormModal>
     );
   }
@@ -260,6 +330,79 @@ function AuthorPaymentForm({ subcontract, userId, accounts, onClose }) {
   };
   return (
     <FormModal title={`Müellif Ödemesi — ${subcontract.authorName}`} onSubmit={submit} onClose={onClose}>
+      <div className="grid grid-cols-1 gap-4">
+        <div className="text-sm bg-gray-50 rounded-md p-2 text-gray-600">Kalan borç: <b className="text-red-600">{formatCurrency(remaining)}</b></div>
+        <Field label="Tutar"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
+        <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={set} /></Field>
+        <Field label="Ödeme Hesabı"><Select name="accountId" value={form.accountId} onChange={set}><option value="">Belirtilmedi</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+        <Field label="Açıklama"><Input name="description" value={form.description} onChange={set} /></Field>
+      </div>
+    </FormModal>
+  );
+}
+
+// --- Projeye taşeron yetkilendirme formu (müellifden ayrı) ---
+function ContractorAssignForm({ project, subcontractors, userId, onClose }) {
+  const [form, setForm] = useState({ contractorId: subcontractors[0]?.id || '', trade: subcontractors[0]?.trade || 'Kaba İnşaat', agreedAmount: '', note: '' });
+  const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const onContractor = (e) => {
+    const c = subcontractors.find((x) => x.id === e.target.value);
+    setForm((f) => ({ ...f, contractorId: e.target.value, trade: c?.trade || f.trade }));
+  };
+  const submit = async (e) => {
+    e.preventDefault();
+    const contractor = subcontractors.find((c) => c.id === form.contractorId);
+    if (!contractor) return alert('Taşeron seçin.');
+    try {
+      await addRecord(userId, 'contractorAssignments', {
+        projectId: project.id, customerId: project.customerId,
+        contractorId: contractor.id, contractorName: contractor.name, trade: form.trade,
+        agreedAmount: Number(form.agreedAmount) || 0, note: form.note,
+      });
+      onClose();
+    } catch (err) { console.error(err); alert('Yetkilendirme kaydedilemedi.'); }
+  };
+  if (subcontractors.length === 0) {
+    return (
+      <FormModal title="Taşeron Yetkilendir" onSubmit={(e) => { e.preventDefault(); onClose(); }} onClose={onClose} submitLabel="Kapat">
+        <p className="text-gray-600 text-sm">Önce <b>Taşeronlar</b> menüsünden taşeron ekleyin, sonra buradan işe yetkilendirebilirsiniz.</p>
+      </FormModal>
+    );
+  }
+  return (
+    <FormModal title={`Taşeron Yetkilendir — ${project.name}`} onSubmit={submit} onClose={onClose}>
+      <div className="grid grid-cols-1 gap-4">
+        <Field label="Taşeron"><Select name="contractorId" value={form.contractorId} onChange={onContractor}>{subcontractors.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.trade})</option>)}</Select></Field>
+        <Field label="İş Kolu"><Select name="trade" value={form.trade} onChange={set}>{TRADES.map((b) => <option key={b}>{b}</option>)}</Select></Field>
+        <Field label="Sözleşme Bedeli"><Input type="number" step="0.01" name="agreedAmount" value={form.agreedAmount} onChange={set} required /></Field>
+        <Field label="Not"><Input name="note" value={form.note} onChange={set} /></Field>
+      </div>
+    </FormModal>
+  );
+}
+
+// --- Taşerona ödeme formu ---
+function ContractorPaymentForm({ assignment, userId, accounts, onClose }) {
+  const remaining = assignment._remaining ?? 0;
+  const [form, setForm] = useState({ amount: '', date: todayInput(), accountId: accounts[0]?.id || '', description: '' });
+  const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!(Number(form.amount) > 0)) return;
+    try {
+      await addRecord(userId, 'transactions', {
+        type: 'odeme', direction: 'out',
+        contractorId: assignment.contractorId, contractorName: assignment.contractorName,
+        contractorAssignmentId: assignment.id, projectId: assignment.projectId,
+        amount: Number(form.amount), accountId: form.accountId || null,
+        description: form.description || `Taşeron ödemesi - ${assignment.contractorName}`,
+        date: Timestamp.fromDate(new Date(form.date)),
+      });
+      onClose();
+    } catch (err) { console.error(err); alert('Ödeme kaydedilemedi.'); }
+  };
+  return (
+    <FormModal title={`Taşeron Ödemesi — ${assignment.contractorName}`} onSubmit={submit} onClose={onClose}>
       <div className="grid grid-cols-1 gap-4">
         <div className="text-sm bg-gray-50 rounded-md p-2 text-gray-600">Kalan borç: <b className="text-red-600">{formatCurrency(remaining)}</b></div>
         <Field label="Tutar"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
@@ -373,16 +516,17 @@ function LedgerTable({ rows, showProject, onEditTx, onDeleteTx }) {
 
 // --- İş / Proje detay (proje bazlı ekstre + müellifler) ---
 function ProjectLedger({ customer, project, data, userId, onBack }) {
-  const { accounts = [], authors = [] } = data;
+  const { accounts = [], authors = [], subcontractors = [] } = data;
   const [editOpen, setEditOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [payFor, setPayFor] = useState(null);
   const [confirmSubId, setConfirmSubId] = useState(null);
   const [editTx, setEditTx] = useState(null);
   const [confirmTxId, setConfirmTxId] = useState(null);
-  const customerProjects = (data.projects || []).filter((p) => p.customerId === customer.id);
+  const customerProjects = getCustomerProjects(customer.id, data);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const JobIcon = jobTypeMeta(project.jobType).icon;
+  const isConstruction = project.jobType === 'insaat';
 
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data, project.id), [customer, project, data]);
   const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
@@ -397,6 +541,31 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
   const subAgreed = subs.reduce((s, x) => s + (Number(x.agreedAmount) || 0), 0);
   const subPaid = subs.reduce((s, x) => s + x._paid, 0);
   const subRemaining = subAgreed - subPaid;
+
+  const contractorAssigns = useMemo(
+    () => (data.contractorAssignments || [])
+      .filter((c) => c.projectId === project.id)
+      .map((c) => ({ ...c, _paid: contractorPaid(c.id, data), _remaining: contractorRemaining(c, data) })),
+    [data, project.id]
+  );
+  const conAgreed = contractorAssigns.reduce((s, x) => s + (Number(x.agreedAmount) || 0), 0);
+  const conPaid = contractorAssigns.reduce((s, x) => s + x._paid, 0);
+  const conRemaining = conAgreed - conPaid;
+
+  // Bu işe tedarikçi olarak bağlı cariler + hareketleri (tek işin tüm taraflarda senkron görünmesi)
+  const linkedRows = useMemo(() => {
+    if (!isConstruction) return [];
+    const linkedCustomerIds = (data.projectLinks || [])
+      .filter((l) => l.projectId === project.id)
+      .map((l) => l.customerId);
+    const out = [];
+    linkedCustomerIds.forEach((cid) => {
+      const partyName = (data.customers || []).find((c) => c.id === cid)?.name || '';
+      const { rows: r } = cariMovements(cid, data, project.id);
+      r.forEach((row) => out.push({ ...row, partyName }));
+    });
+    return out.sort((a, b) => (toDate(a.date)?.getTime() || 0) - (toDate(b.date)?.getTime() || 0));
+  }, [isConstruction, data, project.id]);
 
   return (
     <div>
@@ -422,37 +591,88 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
         <StatCard title="Müşteri Bakiyesi" value={balanceText(balance)} color={balance >= 0 ? 'text-red-600' : 'text-green-600'} />
       </div>
 
-      {/* Müellifler / Taşeronlar */}
-      <Card title="Müellifler / Taşeronlar" className="mb-6" actions={<Button icon={PlusCircle} onClick={() => setSubOpen(true)}>Müellif Ata</Button>}>
-        {subs.length === 0 ? (
-          <EmptyState message="Bu işe atanmış müellif yok. Taşere edeceğiniz branşlar için müellif atayın." icon={DraftingCompass} />
-        ) : (
-          <>
-            <Table headers={[{ label: 'Müellif' }, { label: 'Branş' }, { label: 'Sözleşme', align: 'right' }, { label: 'Ödenen', align: 'right' }, { label: 'Kalan', align: 'right' }, { label: '' }]}>
-              {subs.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <Td className="font-medium text-gray-900">{s.authorName}</Td>
-                  <Td><Badge color="purple">{s.branch}</Badge></Td>
-                  <Td align="right" className="text-gray-700">{formatCurrency(s.agreedAmount)}</Td>
-                  <Td align="right" className="text-green-600">{formatCurrency(s._paid)}</Td>
-                  <Td align="right" className={`font-semibold ${s._remaining > 0.01 ? 'text-red-600' : 'text-gray-500'}`}>{formatCurrency(s._remaining)}</Td>
-                  <Td align="right">
-                    <div className="flex justify-end gap-1">
-                      <button title="Ödeme yap" onClick={() => setPayFor(s)} className="p-2 rounded-full hover:bg-gray-200 text-green-600"><Banknote size={16} /></button>
-                      <button title="Atamayı sil" onClick={() => setConfirmSubId(s.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
-                    </div>
-                  </Td>
-                </tr>
-              ))}
-            </Table>
-            <div className="flex flex-wrap gap-6 justify-end px-4 py-3 border-t text-sm">
-              <span className="text-gray-500">Toplam Sözleşme: <b className="text-gray-800">{formatCurrency(subAgreed)}</b></span>
-              <span className="text-gray-500">Ödenen: <b className="text-green-600">{formatCurrency(subPaid)}</b></span>
-              <span className="text-gray-500">Kalan Borç: <b className="text-red-600">{formatCurrency(subRemaining)}</b></span>
-            </div>
-          </>
-        )}
-      </Card>
+      {/* İnşaat işlerinde Taşeronlar, diğer iş türlerinde Müellifler (ayrı kayıtlar) */}
+      {isConstruction ? (
+        <Card title="Taşeronlar" className="mb-6" actions={<Button icon={PlusCircle} onClick={() => setSubOpen(true)}>Taşeron Yetkilendir</Button>}>
+          {contractorAssigns.length === 0 ? (
+            <EmptyState message="Bu işe yetkilendirilmiş taşeron yok. İş kollarına göre taşeron yetkilendirin." icon={HardHat} />
+          ) : (
+            <>
+              <Table headers={[{ label: 'Taşeron' }, { label: 'İş Kolu' }, { label: 'Sözleşme', align: 'right' }, { label: 'Ödenen', align: 'right' }, { label: 'Kalan', align: 'right' }, { label: '' }]}>
+                {contractorAssigns.map((s) => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <Td className="font-medium text-gray-900">{s.contractorName}</Td>
+                    <Td><Badge color="sky">{s.trade}</Badge></Td>
+                    <Td align="right" className="text-gray-700">{formatCurrency(s.agreedAmount)}</Td>
+                    <Td align="right" className="text-green-600">{formatCurrency(s._paid)}</Td>
+                    <Td align="right" className={`font-semibold ${s._remaining > 0.01 ? 'text-red-600' : 'text-gray-500'}`}>{formatCurrency(s._remaining)}</Td>
+                    <Td align="right">
+                      <div className="flex justify-end gap-1">
+                        <button title="Ödeme yap" onClick={() => setPayFor(s)} className="p-2 rounded-full hover:bg-gray-200 text-green-600"><Banknote size={16} /></button>
+                        <button title="Yetkilendirmeyi sil" onClick={() => setConfirmSubId(s.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </Table>
+              <div className="flex flex-wrap gap-6 justify-end px-4 py-3 border-t text-sm">
+                <span className="text-gray-500">Toplam Sözleşme: <b className="text-gray-800">{formatCurrency(conAgreed)}</b></span>
+                <span className="text-gray-500">Ödenen: <b className="text-green-600">{formatCurrency(conPaid)}</b></span>
+                <span className="text-gray-500">Kalan Borç: <b className="text-red-600">{formatCurrency(conRemaining)}</b></span>
+              </div>
+            </>
+          )}
+        </Card>
+      ) : (
+        <Card title="Müellifler" className="mb-6" actions={<Button icon={PlusCircle} onClick={() => setSubOpen(true)}>Müellif Ata</Button>}>
+          {subs.length === 0 ? (
+            <EmptyState message="Bu işe atanmış müellif yok. Projelendirme branşlarına göre müellif atayın." icon={DraftingCompass} />
+          ) : (
+            <>
+              <Table headers={[{ label: 'Müellif' }, { label: 'Branş' }, { label: 'Sözleşme', align: 'right' }, { label: 'Ödenen', align: 'right' }, { label: 'Kalan', align: 'right' }, { label: '' }]}>
+                {subs.map((s) => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <Td className="font-medium text-gray-900">{s.authorName}</Td>
+                    <Td><Badge color="purple">{s.branch}</Badge></Td>
+                    <Td align="right" className="text-gray-700">{formatCurrency(s.agreedAmount)}</Td>
+                    <Td align="right" className="text-green-600">{formatCurrency(s._paid)}</Td>
+                    <Td align="right" className={`font-semibold ${s._remaining > 0.01 ? 'text-red-600' : 'text-gray-500'}`}>{formatCurrency(s._remaining)}</Td>
+                    <Td align="right">
+                      <div className="flex justify-end gap-1">
+                        <button title="Ödeme yap" onClick={() => setPayFor(s)} className="p-2 rounded-full hover:bg-gray-200 text-green-600"><Banknote size={16} /></button>
+                        <button title="Atamayı sil" onClick={() => setConfirmSubId(s.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </Table>
+              <div className="flex flex-wrap gap-6 justify-end px-4 py-3 border-t text-sm">
+                <span className="text-gray-500">Toplam Sözleşme: <b className="text-gray-800">{formatCurrency(subAgreed)}</b></span>
+                <span className="text-gray-500">Ödenen: <b className="text-green-600">{formatCurrency(subPaid)}</b></span>
+                <span className="text-gray-500">Kalan Borç: <b className="text-red-600">{formatCurrency(subRemaining)}</b></span>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
+
+      {isConstruction && linkedRows.length > 0 && (
+        <Card title="Bağlı Tedarikçi Hareketleri (bu iş)" className="mb-6">
+          <p className="px-6 pt-4 text-xs text-gray-400">Bu işe tedarikçi olarak bağlanan carilerin, aynı iş kaydı üzerinden işlenen hareketleri.</p>
+          <Table headers={[{ label: 'Tarih' }, { label: 'Cari' }, { label: 'İşlem' }, { label: 'Açıklama' }, { label: 'Borç', align: 'right' }, { label: 'Alacak', align: 'right' }]}>
+            {linkedRows.map((r, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <Td className="text-gray-500">{formatDateShort(r.date)}</Td>
+                <Td className="font-medium text-gray-700">{r.partyName}</Td>
+                <Td><Badge color={r.borc ? 'red' : 'green'}>{r.type}</Badge></Td>
+                <Td className="text-gray-600">{r.description}</Td>
+                <Td align="right" className="text-red-600">{r.borc ? formatCurrency(r.borc) : '-'}</Td>
+                <Td align="right" className="text-green-600">{r.alacak ? formatCurrency(r.alacak) : '-'}</Td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      )}
 
       <Card title="Müşteri Hesap Ekstresi (bu iş)">
         {rows.length === 0 ? <EmptyState message="Bu iş için henüz hareket yok" /> : (
@@ -461,9 +681,23 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
       </Card>
 
       {editOpen && <ProjectForm customerId={customer.id} existing={project} userId={userId} onClose={() => setEditOpen(false)} />}
-      {subOpen && <SubcontractForm project={project} authors={authors} userId={userId} onClose={() => setSubOpen(false)} />}
-      {payFor && <AuthorPaymentForm subcontract={payFor} userId={userId} accounts={accounts} onClose={() => setPayFor(null)} />}
-      {confirmSubId && <ConfirmDialog message="Bu müellif atamasını silmek istediğinize emin misiniz? (Yapılan ödemeler silinmez.)" onConfirm={() => deleteRecord(userId, 'subcontracts', confirmSubId)} onClose={() => setConfirmSubId(null)} />}
+      {subOpen && (
+        isConstruction
+          ? <ContractorAssignForm project={project} subcontractors={subcontractors} userId={userId} onClose={() => setSubOpen(false)} />
+          : <SubcontractForm project={project} authors={authors} userId={userId} onClose={() => setSubOpen(false)} />
+      )}
+      {payFor && (
+        isConstruction
+          ? <ContractorPaymentForm assignment={payFor} userId={userId} accounts={accounts} onClose={() => setPayFor(null)} />
+          : <AuthorPaymentForm subcontract={payFor} userId={userId} accounts={accounts} onClose={() => setPayFor(null)} />
+      )}
+      {confirmSubId && (
+        <ConfirmDialog
+          message={`Bu ${isConstruction ? 'taşeron yetkilendirmesini' : 'müellif atamasını'} silmek istediğinize emin misiniz? (Yapılan ödemeler silinmez.)`}
+          onConfirm={() => deleteRecord(userId, isConstruction ? 'contractorAssignments' : 'subcontracts', confirmSubId)}
+          onClose={() => setConfirmSubId(null)}
+        />
+      )}
       {editTx && <TransactionForm customer={customer} existing={editTx} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setEditTx(null)} />}
       {confirmTxId && <ConfirmDialog message="Bu hareketi (tahsilat/ödeme) silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'transactions', confirmTxId)} onClose={() => setConfirmTxId(null)} />}
     </div>
@@ -472,17 +706,26 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
 
 // --- Cari detay / ekstre + işler listesi ---
 function CustomerDetail({ customer, data, userId, onBack }) {
-  const { accounts = [], projects = [] } = data;
+  const { accounts = [] } = data;
   const [payment, setPayment] = useState(null);
   const [projectFormOpen, setProjectFormOpen] = useState(false);
+  const [linkFormOpen, setLinkFormOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [confirmProjectId, setConfirmProjectId] = useState(null);
+  const [confirmUnlinkId, setConfirmUnlinkId] = useState(null);
   const [editTx, setEditTx] = useState(null);
   const [confirmTxId, setConfirmTxId] = useState(null);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
+  const isSupplierRole = customer.role === 'supplier' || customer.role === 'both';
 
-  const customerProjects = useMemo(() => projects.filter((p) => p.customerId === customer.id), [projects, customer.id]);
-  const projectBalances = useMemo(() => customerProjectBalances(customer.id, data), [customer.id, data]);
+  const customerProjects = useMemo(() => getCustomerProjects(customer.id, data), [data, customer.id]);
+  // Not: customerProjectBalances yalnızca sahip olunan işleri hesaplar; bağlı (tedarikçi) işler
+  // için bu carinin KENDİ bakiyesi gerektiğinden burada doğrudan cariMovements kullanılır.
+  const projectBalances = useMemo(() => {
+    const map = {};
+    customerProjects.forEach((p) => { map[p.id] = cariMovements(customer.id, data, p.id).balance; });
+    return map;
+  }, [customerProjects, customer.id, data]);
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data), [customer, data]);
 
   const exportEkstre = () => exportLedgerExcel(`${customer.name} — HESAP EKSTRESİ`, customer, rows, balance, customerProjects.length > 0, customer.name + '-ekstre');
@@ -522,23 +765,36 @@ function CustomerDetail({ customer, data, userId, onBack }) {
       <QuickEntry customer={customer} userId={userId} accounts={accounts} />
 
       {/* İşler / Projeler */}
-      <Card title="İşler / Projeler" className="mb-6" actions={<Button icon={PlusCircle} onClick={() => setProjectFormOpen(true)}>Yeni İş</Button>}>
+      <Card
+        title="İşler / Projeler"
+        className="mb-6"
+        actions={<Button icon={PlusCircle} onClick={() => (isSupplierRole ? setLinkFormOpen(true) : setProjectFormOpen(true))}>Yeni İş</Button>}
+      >
         {customerProjects.length === 0 ? (
           <EmptyState message="Bu cariye ait iş/proje yok. Farklı arsa/işleri ayrı takip etmek için 'Yeni İş' ekleyin." icon={Briefcase} />
         ) : (
           <Table headers={[{ label: 'İş / Proje' }, { label: 'Adres' }, { label: 'Durum' }, { label: 'Bakiye', align: 'right' }, { label: '' }]}>
             {customerProjects.map((p) => {
               const PIcon = jobTypeMeta(p.jobType).icon;
+              const linkDoc = p._linked ? (data.projectLinks || []).find((l) => l.projectId === p.id && l.customerId === customer.id) : null;
               return (
               <tr key={p.id} className="hover:bg-gray-50">
                 <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setSelectedProject(p)}>
-                  <span className="flex items-center gap-2"><PIcon size={15} className="text-orange-600" />{p.name}</span>
+                  <span className="flex items-center gap-2">
+                    <PIcon size={15} className="text-orange-600" />
+                    {p.name}
+                    {p._linked && <span title="Başka bir cariye ait, tedarikçi olarak bağlısınız" className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-600"><Link2 size={10} />Bağlı</span>}
+                  </span>
                 </Td>
                 <Td className="text-gray-500">{p.address || '-'}</Td>
                 <Td><Badge color={p.status === 'done' ? 'green' : p.status === 'paused' ? 'yellow' : 'sky'}>{p.status === 'done' ? 'Tamamlandı' : p.status === 'paused' ? 'Beklemede' : 'Devam Ediyor'}</Badge></Td>
                 <Td align="right">{balanceBadge(projectBalances[p.id] || 0)}</Td>
                 <Td align="right">
-                  <button onClick={() => setConfirmProjectId(p.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
+                  {p._linked ? (
+                    <button title="Bağlantıyı kaldır" onClick={() => setConfirmUnlinkId(linkDoc?.id)} className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><Unlink size={16} /></button>
+                  ) : (
+                    <button title="İşi sil" onClick={() => setConfirmProjectId(p.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
+                  )}
                 </Td>
               </tr>
               );
@@ -557,7 +813,17 @@ function CustomerDetail({ customer, data, userId, onBack }) {
 
       {payment && <PaymentForm type={payment === 'tahsilat' ? 'tahsilat' : 'odeme'} customer={customer} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setPayment(null)} />}
       {projectFormOpen && <ProjectForm customerId={customer.id} userId={userId} onClose={() => setProjectFormOpen(false)} />}
+      {linkFormOpen && (
+        <JobLinkForm
+          customer={customer}
+          data={data}
+          userId={userId}
+          onClose={() => setLinkFormOpen(false)}
+          onOtherJob={() => setProjectFormOpen(true)}
+        />
+      )}
       {confirmProjectId && <ConfirmDialog message="Bu işi/projeyi silmek istediğinize emin misiniz? (İşe bağlı hareketler silinmez, 'Genel' altında kalır.)" onConfirm={() => deleteRecord(userId, 'projects', confirmProjectId)} onClose={() => setConfirmProjectId(null)} />}
+      {confirmUnlinkId && <ConfirmDialog message="Bu işe olan bağlantınız kaldırılsın mı? (İş kaydı silinmez, sadece bu cariden bağlantısı kesilir.)" onConfirm={() => deleteRecord(userId, 'projectLinks', confirmUnlinkId)} onClose={() => setConfirmUnlinkId(null)} />}
       {editTx && <TransactionForm customer={customer} existing={editTx} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setEditTx(null)} />}
       {confirmTxId && <ConfirmDialog message="Bu hareketi (tahsilat/ödeme) silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'transactions', confirmTxId)} onClose={() => setConfirmTxId(null)} />}
     </div>

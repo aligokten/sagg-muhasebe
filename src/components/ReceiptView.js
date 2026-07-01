@@ -16,7 +16,7 @@ const printStyles = `@media print{
 const paymentLabel = (accounts, accountId) => {
   const acc = (accounts || []).find((a) => a.id === accountId);
   if (!acc) return 'Belirtilmemiştir';
-  if (acc.type === 'Nakit Kasa') return 'Nakit';
+  if (acc.type === 'Nakit' || acc.type === 'Nakit Kasa') return 'Nakit';
   if (acc.type === 'Kredi Kartı') return 'Kredi Kartı';
   if (acc.type === 'POS') return 'POS';
   return 'Havale/EFT';
