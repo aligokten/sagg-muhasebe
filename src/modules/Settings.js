@@ -1,15 +1,32 @@
 // --- Ayarlar (Şirket Profili + Yedekleme) ---
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Download, Upload, Image as ImageIcon } from 'lucide-react';
-import { setRecord } from '../firebase';
-import { PageHeader, Card, Button, Field, Input, Textarea } from '../components/ui';
+import { X, Save, Download, Upload, Image as ImageIcon, CreditCard } from 'lucide-react';
+import { setRecord, subscribeSubscription, ADMIN_EMAIL } from '../firebase';
+import { PageHeader, Card, Button, Field, Input, Textarea, Badge } from '../components/ui';
 import { downloadBackup, restoreBackup, countRecords, loadFromUid, writeLoaded } from '../backup';
+import { formatDateShort } from '../utils';
+import PaymentOptions from '../components/PaymentOptions';
 
-export default function Settings({ userId, companyProfile, data = {} }) {
+const SUB_STATUS_META = {
+  trial: { label: 'Deneme', color: 'blue' },
+  active: { label: 'Aktif', color: 'green' },
+  expired: { label: 'Süresi Doldu', color: 'red' },
+  suspended: { label: 'Askıda', color: 'yellow' },
+};
+
+export default function Settings({ userId, userEmail, companyProfile, data = {} }) {
   const fileRef = useRef(null);
   const [restoring, setRestoring] = useState(false);
   const [sourceUid, setSourceUid] = useState('');
   const [migrating, setMigrating] = useState(false);
+  const [sub, setSub] = useState(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const isAdmin = userEmail === ADMIN_EMAIL;
+
+  useEffect(() => {
+    if (isAdmin) return;
+    return subscribeSubscription(userId, setSub);
+  }, [userId, isAdmin]);
 
   const handleMigrate = async () => {
     const src = sourceUid.trim();
@@ -113,6 +130,21 @@ export default function Settings({ userId, companyProfile, data = {} }) {
     <div>
       <PageHeader title="Ayarlar" subtitle="Şirket ve fatura bilgileriniz" />
 
+      {!isAdmin && (
+        <Card title="Abonelik" className="mb-6">
+          <div className="p-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Badge color={(SUB_STATUS_META[sub?.status]?.color) || 'gray'}>{SUB_STATUS_META[sub?.status]?.label || 'Bilinmiyor'}</Badge>
+              <p className="text-sm text-gray-500">
+                {sub?.status === 'active' && sub.expiresAt && <>Bitiş tarihi: <b>{formatDateShort(sub.expiresAt)}</b></>}
+                {sub?.status === 'trial' && sub.trialEndsAt && <>Deneme süresi bitişi: <b>{formatDateShort(sub.trialEndsAt)}</b></>}
+              </p>
+            </div>
+            <Button icon={CreditCard} onClick={() => setPaymentOpen(true)}>Ödeme Yap / Süre Uzat</Button>
+          </div>
+        </Card>
+      )}
+
       <Card title="Şirket Bilgileri" className="mb-6">
         <div className="px-6 pt-6">
           <span className="text-sm font-medium text-gray-600">Firma Logosu</span>
@@ -206,6 +238,8 @@ service cloud.firestore {
           <p className="text-[11px] text-gray-400 mt-2">Şu anki hesabınızın UID'i: <code className="break-all">{userId}</code></p>
         </div>
       </Card>
+
+      {paymentOpen && <PaymentOptions userId={userId} userEmail={userEmail} onClose={() => setPaymentOpen(false)} />}
     </div>
   );
 }

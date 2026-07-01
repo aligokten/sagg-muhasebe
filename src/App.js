@@ -9,11 +9,12 @@ import {
 import {
   auth, onAuthStateChanged, signOut,
   subscribeCollection, subscribeDoc, setRecord,
-  subscribeSubscription, createTrialSubscription, ADMIN_EMAIL,
+  subscribeSubscription, createTrialSubscription, subscribeAllPaymentRequests, ADMIN_EMAIL,
 } from './firebase';
 import { Spinner } from './components/ui';
 import { toDate } from './utils';
 import AuthModal from './components/AuthModal';
+import PaymentOptions from './components/PaymentOptions';
 import Topbar from './components/Topbar';
 import { COLLECTIONS } from './constants';
 import AdminSubscriptions from './modules/AdminSubscriptions';
@@ -256,6 +257,15 @@ export default function App() {
     return 'expired';
   })();
 
+  // Yönetici için: bekleyen ödeme taleplerini dinle (bildirim çanına düşer)
+  const [paymentRequests, setPaymentRequests] = useState([]);
+  useEffect(() => {
+    if (!isAdmin) { setPaymentRequests([]); return; }
+    return subscribeAllPaymentRequests(setPaymentRequests);
+  }, [isAdmin]);
+
+  const [paymentOpen, setPaymentOpen] = useState(false);
+
   // Tüm koleksiyonları ve şirket profilini dinle
   useEffect(() => {
     if (!userId) return;
@@ -300,7 +310,12 @@ export default function App() {
   }
 
   if (!isAdmin && entitlement !== 'active') {
-    return <SubscriptionLocked entitlement={entitlement} onLogout={handleLogout} />;
+    return (
+      <>
+        <SubscriptionLocked entitlement={entitlement} onLogout={handleLogout} onPay={() => setPaymentOpen(true)} />
+        {paymentOpen && <PaymentOptions userId={userId} userEmail={userEmail} onClose={() => setPaymentOpen(false)} />}
+      </>
+    );
   }
 
   const fullData = { ...data, scriptsLoaded };
@@ -325,7 +340,7 @@ export default function App() {
       case 'reports': return <Reports data={fullData} />;
       case 'agenda': return <Agenda data={fullData} userId={userId} />;
       case 'arsapay': return <ArsaPaylastir />;
-      case 'settings': return <Settings userId={userId} companyProfile={data.companyProfile} data={fullData} />;
+      case 'settings': return <Settings userId={userId} userEmail={userEmail} companyProfile={data.companyProfile} data={fullData} />;
       default: return <Dashboard data={fullData} setPage={setCurrentPage} />;
     }
   };
@@ -355,6 +370,7 @@ export default function App() {
           logo={data.companyProfile?.logo}
           avatar={avatar}
           setAvatar={pickAvatar}
+          pendingPaymentRequests={isAdmin ? paymentRequests.filter((r) => r.status === 'pending').length : 0}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{renderPage()}</main>
       </div>
@@ -370,14 +386,17 @@ const LOCK_MESSAGES = {
   none: 'Hesabınız için bir abonelik kaydı bulunamadı.',
 };
 
-function SubscriptionLocked({ entitlement, onLogout }) {
+function SubscriptionLocked({ entitlement, onLogout, onPay }) {
   return (
     <div className="flex items-center justify-center h-screen bg-gray-100 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
         <Lock className="mx-auto h-10 w-10 text-orange-500 mb-3" />
         <h2 className="text-lg font-bold text-gray-800 mb-2">Erişim Kısıtlı</h2>
         <p className="text-sm text-gray-600 mb-1">{LOCK_MESSAGES[entitlement] || LOCK_MESSAGES.none}</p>
-        <p className="text-sm text-gray-500 mb-6">Devam etmek için hesabınızı yöneten kişiyle iletişime geçin.</p>
+        <p className="text-sm text-gray-500 mb-6">Devam etmek için aboneliğinizi yenileyin veya hesabınızı yöneten kişiyle iletişime geçin.</p>
+        <button onClick={onPay} className="flex items-center justify-center gap-2 w-full bg-orange-600 hover:bg-orange-700 text-white rounded-lg py-2 text-sm font-medium mx-auto mb-2">
+          Ödeme Yap / Süre Uzat
+        </button>
         <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full bg-gray-700 hover:bg-gray-800 text-white rounded-lg py-2 text-sm font-medium mx-auto">
           <LogOut size={15} /> Çıkış Yap
         </button>

@@ -116,3 +116,29 @@ export const subscribeAllSubscriptions = (cb) =>
 
 export const updateSubscription = (uid, data) =>
   updateDoc(subscriptionDocRef(uid), { ...data, updatedAt: Timestamp.now() });
+
+// --- Ödeme talepleri (müşterinin "ödedim" bildirimi) ---
+const paymentRequestsColRef = () => collection(db, `artifacts/${appId}/paymentRequests`);
+
+export const createPaymentRequest = (uid, email, method, note) =>
+  addDoc(paymentRequestsColRef(), {
+    uid, email, method, note: note || '', status: 'pending', createdAt: Timestamp.now(),
+  });
+
+export const subscribeAllPaymentRequests = (cb) =>
+  onSnapshot(
+    paymentRequestsColRef(),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.error('ödeme talepleri okunurken hata:', err)
+  );
+
+export const updatePaymentRequest = (id, data) =>
+  updateDoc(doc(db, `artifacts/${appId}/paymentRequests`, id), data);
+
+// --- Ödeme alınacak hesap bilgileri (yönetici tarafından girilir) ---
+const paymentInfoDocRef = () => doc(db, `artifacts/${appId}/appConfig`, 'paymentInfo');
+
+export const subscribePaymentInfo = (cb) =>
+  onSnapshot(paymentInfoDocRef(), (snap) => cb(snap.exists() ? snap.data() : null));
+
+export const setPaymentInfo = (data) => setDoc(paymentInfoDocRef(), data);
