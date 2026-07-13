@@ -2,11 +2,12 @@
 import React, { useState, useMemo } from 'react';
 import { Edit, Trash2, UserCog, Banknote } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
-import { formatCurrency, formatDateShort, todayInput, sum } from '../utils';
+import { formatCurrency, formatDateShort, todayInput, sum, nextReceiptNo } from '../utils';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
   FormModal, ConfirmDialog, Field, Input, Select,
 } from '../components/ui';
+import ReceiptView from '../components/ReceiptView';
 
 function PersonForm({ existing, userId, onClose }) {
   const [form, setForm] = useState(
@@ -38,19 +39,22 @@ function PersonForm({ existing, userId, onClose }) {
   );
 }
 
-function SalaryForm({ person, userId, accounts, onClose }) {
+function SalaryForm({ person, userId, accounts, expenses, onClose, onPaid }) {
   const [form, setForm] = useState({ amount: person.salary || '', date: todayInput(), accountId: accounts[0]?.id || '', period: '' });
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const submit = async (e) => {
     e.preventDefault();
     if (!(Number(form.amount) > 0)) return;
-    await addRecord(userId, 'expenses', {
+    const receiptNo = nextReceiptNo(expenses, 'expenses');
+    const payload = {
       date: Timestamp.fromDate(new Date(form.date)),
       category: 'Personel', description: `Maaş ödemesi - ${person.name}${form.period ? ` (${form.period})` : ''}`,
       amount: Number(form.amount), vatRate: 0, accountId: form.accountId || null, personId: person.id,
-    });
+      customerName: person.name, isPersonnel: true, receiptNo,
+    };
+    const ref = await addRecord(userId, 'expenses', payload);
     onClose();
-    alert('Maaş ödemesi gider olarak kaydedildi.');
+    onPaid({ ...payload, id: ref.id });
   };
   return (
     <FormModal title={`Maaş Ödemesi — ${person.name}`} onSubmit={submit} onClose={onClose}>
@@ -65,11 +69,12 @@ function SalaryForm({ person, userId, accounts, onClose }) {
 }
 
 export default function Personnel({ data, userId }) {
-  const { personnel = [], accounts = [] } = data;
+  const { personnel = [], accounts = [], expenses = [], companyProfile, scriptsLoaded } = data;
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [salaryFor, setSalaryFor] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [receiptFor, setReceiptFor] = useState(null);
 
   const active = personnel.filter((p) => p.status !== 'passive');
   const payroll = useMemo(() => sum(active, (p) => p.salary), [active]);
@@ -110,7 +115,26 @@ export default function Personnel({ data, userId }) {
       </Card>
 
       {formOpen && <PersonForm existing={editing} userId={userId} onClose={() => { setFormOpen(false); setEditing(null); }} />}
-      {salaryFor && <SalaryForm person={salaryFor} userId={userId} accounts={accounts} onClose={() => setSalaryFor(null)} />}
+      {salaryFor && (
+        <SalaryForm
+          person={salaryFor}
+          userId={userId}
+          accounts={accounts}
+          expenses={expenses}
+          onClose={() => setSalaryFor(null)}
+          onPaid={(record) => setReceiptFor(record)}
+        />
+      )}
+      {receiptFor && (
+        <ReceiptView
+          kind="expenses"
+          record={receiptFor}
+          companyProfile={companyProfile}
+          accounts={accounts}
+          scriptsLoaded={scriptsLoaded}
+          onClose={() => setReceiptFor(null)}
+        />
+      )}
       {confirmId && <ConfirmDialog message="Bu personeli silmek istediğinize emin misiniz?" onConfirm={() => deleteRecord(userId, 'personnel', confirmId)} onClose={() => setConfirmId(null)} />}
     </div>
   );
