@@ -24,11 +24,12 @@ const paymentLabel = (accounts, accountId) => {
 
 const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, accounts, qrDataUrl }) => {
   const isIncome = kind === 'incomes';
-  const title = isIncome ? 'TAHSİLAT MAKBUZU' : 'ÖDEME MAKBUZU';
+  const isPersonnel = !!record.isPersonnel;
+  const title = isPersonnel ? 'MAAŞ ÖDEME MAKBUZU' : isIncome ? 'TAHSİLAT MAKBUZU' : 'ÖDEME MAKBUZU';
   const verb = isIncome ? 'tahsil edilmiştir' : 'ödenmiştir';
   const partyName = record.customerName || '..........................................';
-  const leftSign = isIncome ? 'TESLİM EDEN (Ödeyen)' : 'ÖDEYEN (Yetkili)';
-  const rightSign = isIncome ? 'TESLİM ALAN (Yetkili)' : 'TESLİM ALAN (Alacaklı)';
+  const leftSign = isPersonnel ? 'ÖDEYEN (Yetkili)' : isIncome ? 'TESLİM EDEN (Ödeyen)' : 'ÖDEYEN (Yetkili)';
+  const rightSign = isPersonnel ? 'TESLİM ALAN (Personel)' : isIncome ? 'TESLİM ALAN (Yetkili)' : 'TESLİM ALAN (Alacaklı)';
 
   return (
     <div
@@ -66,11 +67,13 @@ const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, account
           <p><span className="text-gray-500">Tutar (Yazı):</span> {numberToWordsTr(record.amount)}</p>
         </div>
 
-        <div className="mt-1.5 text-[10px] text-gray-400">
-          Not:
-          <div className="border-b border-gray-300 mt-1.5" />
-          <div className="border-b border-gray-300 mt-2" />
-        </div>
+        {!isPersonnel && (
+          <div className="mt-1.5 text-[10px] text-gray-400">
+            Not:
+            <div className="border-b border-gray-300 mt-1.5" />
+            <div className="border-b border-gray-300 mt-2" />
+          </div>
+        )}
 
         <div className="mt-auto pt-3 flex items-start gap-3">
           {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: 68, height: 68, flexShrink: 0 }} />}
@@ -145,7 +148,7 @@ export default function ReceiptView({ kind, record, companyProfile, accounts, on
       <div className="bg-white shadow-2xl my-8 rounded-lg overflow-auto max-w-full">
         <div id="receipt-print-area" ref={printRef} className="flex" style={{ width: '297mm', minHeight: '210mm', background: '#fff' }}>
           <ReceiptCopy copyLabel="İŞYERİ NÜSHASI" divider kind={kind} record={record} companyProfile={companyProfile} accounts={accounts} qrDataUrl={qrDataUrl} />
-          <ReceiptCopy copyLabel="MÜŞTERİ NÜSHASI" kind={kind} record={record} companyProfile={companyProfile} accounts={accounts} qrDataUrl={qrDataUrl} />
+          <ReceiptCopy copyLabel={record.isPersonnel ? 'PERSONEL NÜSHASI' : 'MÜŞTERİ NÜSHASI'} kind={kind} record={record} companyProfile={companyProfile} accounts={accounts} qrDataUrl={qrDataUrl} />
         </div>
         <div className="p-4 bg-gray-50 flex justify-end space-x-2 no-print rounded-b-lg sticky bottom-0">
           <Button variant="secondary" onClick={onClose}>Kapat</Button>
