@@ -16,6 +16,17 @@ const initials = (name) =>
 
 const AVATAR_COLORS = ['bg-orange-100 text-orange-700', 'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700'];
 
+const TAG_COLOR = {
+  'Satış': 'bg-sky-100 text-sky-700',
+  'Alış': 'bg-purple-100 text-purple-700',
+  'Tahsilat': 'bg-emerald-100 text-emerald-700',
+  'Ödeme': 'bg-rose-100 text-rose-700',
+  'Gelir': 'bg-emerald-100 text-emerald-700',
+  'Gider': 'bg-amber-100 text-amber-700',
+  'Virman': 'bg-gray-100 text-gray-700',
+  'Cari Hareket': 'bg-blue-100 text-blue-700',
+};
+
 const ChangeBadge = ({ value, light }) => {
   if (value === null || value === undefined || !isFinite(value)) return null;
   const up = value >= 0;
@@ -107,15 +118,22 @@ export default function Dashboard({ data, setPage }) {
   const avgIncome = gelirSeries.reduce((s, x) => s + x.v, 0) / (gelirSeries.length || 1);
   const avgExpense = giderSeries.reduce((s, x) => s + x.v, 0) / (giderSeries.length || 1);
 
-  // Son işlemler
+  // Son işlemler (faturalar, tahsilat/ödeme, gelir/gider, virman, manuel cari hareket)
   const recent = useMemo(() => {
     const items = [
       ...salesInv.map((i) => ({ name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Satış', neg: false, date: toDate(i.date) })),
       ...purchInv.map((i) => ({ name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Alış', neg: true, date: toDate(i.date) })),
-      ...tahsilatlar.map((t) => ({ name: t.customerName, doc: 'Tahsilat', amount: t.amount, tag: 'Tahsilat', neg: false, date: toDate(t.date) })),
+      ...transactions.map((t) => {
+        if (t.type === 'tahsilat') return { name: t.customerName, doc: 'Tahsilat', amount: t.amount, tag: 'Tahsilat', neg: false, date: toDate(t.date) };
+        if (t.type === 'odeme') return { name: t.customerName, doc: 'Ödeme', amount: t.amount, tag: 'Ödeme', neg: true, date: toDate(t.date) };
+        if (t.type === 'transfer') return { name: t.description || 'Virman', doc: 'Virman', amount: t.amount, tag: 'Virman', neg: false, date: toDate(t.date) };
+        return { name: t.customerName || t.description, doc: 'Cari Hareket', amount: t.amount, tag: 'Cari Hareket', neg: t.cariEffect !== 'alacak', date: toDate(t.date) };
+      }),
+      ...incomes.map((r) => ({ name: r.customerName || r.description || r.category, doc: r.category || 'Gelir', amount: r.amount, tag: 'Gelir', neg: false, date: toDate(r.date) })),
+      ...expenses.map((r) => ({ name: r.customerName || r.description || r.category, doc: r.category || 'Gider', amount: r.amount, tag: 'Gider', neg: true, date: toDate(r.date) })),
     ];
     return items.filter((x) => x.date).sort((a, b) => b.date - a.date).slice(0, 6);
-  }, [salesInv, purchInv, tahsilatlar]);
+  }, [salesInv, purchInv, transactions, incomes, expenses]);
 
   const handleExport = () => {
     const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -296,7 +314,7 @@ export default function Dashboard({ data, setPage }) {
                       <p className={`text-sm font-medium truncate ${heading}`}>{r.name || '—'}</p>
                       <p className={`text-xs truncate ${muted}`}>{r.doc} · {formatDateShort(r.date)}</p>
                     </div>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${r.tag === 'Tahsilat' ? 'bg-emerald-100 text-emerald-700' : r.tag === 'Alış' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>{r.tag}</span>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TAG_COLOR[r.tag] || 'bg-orange-100 text-orange-700'}`}>{r.tag}</span>
                     <p className={`text-sm font-semibold w-24 text-right ${r.neg ? 'text-rose-600' : 'text-gray-800 dark:text-gray-100'}`}>{r.neg ? '-' : ''}{formatCurrency(r.amount)}</p>
                   </div>
                 ))}
