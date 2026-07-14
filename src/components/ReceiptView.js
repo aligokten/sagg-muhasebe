@@ -27,7 +27,7 @@ const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, account
   const isPersonnel = !!record.isPersonnel;
   const title = isPersonnel ? 'MAAŞ ÖDEME MAKBUZU' : isIncome ? 'TAHSİLAT MAKBUZU' : 'ÖDEME MAKBUZU';
   const verb = isIncome ? 'tahsil edilmiştir' : 'ödenmiştir';
-  const partyName = record.customerName || '..........................................';
+  const partyName = record.payeeName || record.customerName || '..........................................';
   const leftSign = isPersonnel ? 'ÖDEYEN (Yetkili)' : isIncome ? 'TESLİM EDEN (Ödeyen)' : 'ÖDEYEN (Yetkili)';
   const rightSign = isPersonnel ? 'TESLİM ALAN (Personel)' : isIncome ? 'TESLİM ALAN (Yetkili)' : 'TESLİM ALAN (Alacaklı)';
 
@@ -110,7 +110,7 @@ export default function ReceiptView({ kind, record, companyProfile, accounts, on
       `Seri No: ${record.receiptNo || ''}`,
       `Tarih: ${formatDate(record.date)}`,
       `Tutar: ${formatCurrency(record.amount)}`,
-      `Taraf: ${record.customerName || '-'}`,
+      `Taraf: ${record.payeeName || record.customerName || '-'}`,
       `Açıklama: ${record.description || record.category || '-'}`,
     ];
     QRCode.toDataURL(lines.join('\n'), { margin: 1, width: 200 })
