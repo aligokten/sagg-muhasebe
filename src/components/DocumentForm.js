@@ -115,7 +115,7 @@ export default function DocumentForm({
 
           <div className="p-5">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <Field label={kind === 'purchase' ? 'Tedarikçi' : 'Cari Hesap'} className="lg:col-span-2">
+              <Field label={kind === 'purchase' ? 'Tedarikçi' : 'Müşteri'} className="lg:col-span-2">
                 <Select
                   name="customerId"
                   value={form.customerId}
