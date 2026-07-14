@@ -911,6 +911,12 @@ function CustomerDetail({ customer, data, userId, onBack }) {
   );
 }
 
+const CARI_TABS = [
+  { key: 'customer', label: 'Müşteri', match: (c) => c.role === 'customer' || c.role === 'both' || !c.role },
+  { key: 'supplier', label: 'Tedarikçi', match: (c) => c.role === 'supplier' || c.role === 'both' },
+  { key: 'other', label: 'Diğer', match: (c) => ['kiraci', 'malsahibi', 'apartman'].includes(c.role) },
+];
+
 export default function Customers({ data, userId }) {
   const { customers = [] } = data;
   const [formOpen, setFormOpen] = useState(false);
@@ -918,12 +924,14 @@ export default function Customers({ data, userId }) {
   const [confirmId, setConfirmId] = useState(null);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
+  const [roleTab, setRoleTab] = useState('customer');
 
   const balances = useMemo(() => allCariBalances(data), [data]);
 
+  const activeTab = CARI_TABS.find((t) => t.key === roleTab) || CARI_TABS[0];
   const filtered = useMemo(
-    () => customers.filter((c) => c.name?.toLowerCase().includes(search.toLowerCase())),
-    [customers, search]
+    () => customers.filter((c) => activeTab.match(c) && c.name?.toLowerCase().includes(search.toLowerCase())),
+    [customers, search, activeTab]
   );
 
   const totalReceivable = customers.reduce((s, c) => s + Math.max(0, balances[c.id] || 0), 0);
@@ -941,9 +949,15 @@ export default function Customers({ data, userId }) {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Cari Sayısı" value={customers.length} icon={Users} color="text-orange-600" />
+        <StatCard title="Cari Sayısı" value={filtered.length} icon={Users} color="text-orange-600" />
         <StatCard title="Toplam Alacak" value={formatCurrency(totalReceivable)} color="text-red-600" hint="Bizden alacaklı olduğumuz" />
         <StatCard title="Toplam Borç" value={formatCurrency(totalPayable)} color="text-green-600" hint="Bizim borçlu olduğumuz" />
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        {CARI_TABS.map((t) => (
+          <button key={t.key} onClick={() => setRoleTab(t.key)} className={`px-4 py-2 rounded-lg text-sm font-medium ${roleTab === t.key ? 'bg-orange-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{t.label}</button>
+        ))}
       </div>
 
       <div className="mb-4">
