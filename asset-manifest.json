@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "./static/css/main.3cb06571.css",
-    "main.js": "./static/js/main.7388e006.js",
+    "main.js": "./static/js/main.4229d285.js",
     "static/js/453.4546fc67.chunk.js": "./static/js/453.4546fc67.chunk.js",
     "static/media/arsapay-logo.png": "./static/media/arsapay-logo.6a7315d2610ce130757a.png",
     "index.html": "./index.html",
     "main.3cb06571.css.map": "./static/css/main.3cb06571.css.map",
-    "main.7388e006.js.map": "./static/js/main.7388e006.js.map",
+    "main.4229d285.js.map": "./static/js/main.4229d285.js.map",
     "453.4546fc67.chunk.js.map": "./static/js/453.4546fc67.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.3cb06571.css",
-    "static/js/main.7388e006.js"
+    "static/js/main.4229d285.js"
   ]
 }
