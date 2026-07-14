@@ -28,21 +28,21 @@ export function EntryForm({ kind, existing, existingList, userId, accounts, cust
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const customerProjects = projects.filter((p) => p.customerId === form.customerId);
 
-  const [partyTab, setPartyTab] = useState(existing?.contractorId ? 'taseron' : 'cari');
-  const selectCari = (e) => setForm({ ...form, customerId: e.target.value, contractorId: '', projectId: '' });
-  const selectTaseron = (e) => setForm({ ...form, contractorId: e.target.value, customerId: '', projectId: '' });
+  const selectCari = (e) => setForm({ ...form, customerId: e.target.value, projectId: '' });
+  const selectTaseron = (e) => setForm({ ...form, contractorId: e.target.value });
 
   const submit = async (e) => {
     e.preventDefault();
     if (!(Number(form.amount) > 0)) return;
     const customer = customers.find((c) => c.id === form.customerId);
     const contractor = subcontractors.find((s) => s.id === form.contractorId);
+    const partyName = customer && contractor ? `${customer.name} → ${contractor.name}` : customer?.name || contractor?.name || null;
     const payload = {
       ...form, amount: Number(form.amount), vatRate: Number(form.vatRate) || 0,
       accountId: form.accountId || null,
       customerId: form.customerId || null,
       contractorId: form.contractorId || null,
-      customerName: customer?.name || contractor?.name || null,
+      customerName: partyName,
       projectId: form.projectId || null,
       date: Timestamp.fromDate(new Date(form.date)),
     };
@@ -61,42 +61,13 @@ export function EntryForm({ kind, existing, existingList, userId, accounts, cust
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={set} required /></Field>
         <Field label="Kategori"><CategorySelect name="category" value={form.category} onChange={set} /></Field>
-        {!isIncome && subcontractors.length > 0 ? (
-          <Field label={partyTab === 'cari' ? 'Cari (opsiyonel)' : 'Taşeron / Tedarikçi (opsiyonel)'}>
-            <div className="flex gap-1 mb-1.5">
-              <button
-                type="button"
-                onClick={() => setPartyTab('cari')}
-                className={`flex-1 px-2 py-1 rounded-md text-xs font-medium ${partyTab === 'cari' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                Cari
-              </button>
-              <button
-                type="button"
-                onClick={() => setPartyTab('taseron')}
-                className={`flex-1 px-2 py-1 rounded-md text-xs font-medium ${partyTab === 'taseron' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                Taşeron / Tedarikçi
-              </button>
-            </div>
-            {partyTab === 'cari' ? (
-              <Select name="customerId" value={form.customerId} onChange={selectCari}>
-                <option value="">Seçilmedi</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
-            ) : (
-              <Select name="contractorId" value={form.contractorId} onChange={selectTaseron}>
-                <option value="">Seçilmedi</option>
-                {subcontractors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Select>
-            )}
-          </Field>
-        ) : (
-          <Field label="Cari (opsiyonel)"><Select name="customerId" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, contractorId: '', projectId: '' })}><option value="">Seçilmedi</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label="Cari (opsiyonel)"><Select name="customerId" value={form.customerId} onChange={selectCari}><option value="">Seçilmedi</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        {!isIncome && subcontractors.length > 0 && (
+          <Field label="Taşeron / Tedarikçi (opsiyonel)"><Select name="contractorId" value={form.contractorId} onChange={selectTaseron}><option value="">Seçilmedi</option>{subcontractors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
         )}
-        {customerProjects.length > 0 ? (
+        {customerProjects.length > 0 && (
           <Field label="İş / Proje"><Select name="projectId" value={form.projectId} onChange={set}><option value="">Genel</option>{customerProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
-        ) : <div />}
+        )}
         <Field label="Açıklama" className="md:col-span-2"><Input name="description" value={form.description} onChange={set} /></Field>
         <Field label="Tutar (KDV Dahil)"><Input type="number" step="0.01" name="amount" value={form.amount} onChange={set} required /></Field>
         <Field label="KDV %"><Select name="vatRate" value={form.vatRate} onChange={set}>{[0, 1, 10, 20].map((r) => <option key={r} value={r}>%{r}</option>)}</Select></Field>
