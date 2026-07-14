@@ -145,8 +145,8 @@ export default function CashFlow({ data, userId }) {
               <tr key={x.id} className="hover:bg-gray-50">
                 <Td className="text-gray-500">{formatDateShort(x.date)}</Td>
                 <Td className="text-gray-600">{x.category || '-'}</Td>
-                <Td className="font-medium text-gray-900">{x.description}</Td>
-                <Td className="text-gray-500">{x.customerName || '-'}</Td>
+                <Td wrap className="font-medium text-gray-900 max-w-xs">{x.description}</Td>
+                <Td wrap className="text-gray-500 max-w-xs">{x.customerName || '-'}</Td>
                 <Td className="text-gray-500">{accName(x.accountId)}</Td>
                 <Td align="right" className={`font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(x.amount)}</Td>
                 <Td align="right">

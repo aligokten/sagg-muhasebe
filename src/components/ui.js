@@ -113,9 +113,9 @@ export const Table = ({ headers, children }) => (
   </div>
 );
 
-export const Td = ({ children, align = 'left', className = '', ...props }) => (
+export const Td = ({ children, align = 'left', wrap = false, className = '', ...props }) => (
   <td
-    className={`px-4 py-3 whitespace-nowrap text-sm ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}
+    className={`px-4 py-3 text-sm ${wrap ? 'whitespace-normal break-words' : 'whitespace-nowrap'} ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}
     {...props}
   >
     {children}
