@@ -51,6 +51,8 @@ export function EntryForm({ kind, existing, existingList, userId, accounts, cust
     const customer = customers.find((c) => c.id === form.customerId);
     const other = otherParties.find((p) => p.id === form.contractorId && p.kind === form.contractorKind);
     const partyName = customer && other ? `${customer.name} → ${other.name}` : customer?.name || other?.name || null;
+    // Makbuzda ödemeyi fiilen alan taraf gösterilir: taşeron/tedarikçi seçiliyse o, değilse cari.
+    const payeeName = other?.name || customer?.name || null;
     const payload = {
       ...form, amount: Number(form.amount), vatRate: Number(form.vatRate) || 0,
       accountId: form.accountId || null,
@@ -58,6 +60,7 @@ export function EntryForm({ kind, existing, existingList, userId, accounts, cust
       contractorId: form.contractorId || null,
       contractorKind: form.contractorKind || null,
       customerName: partyName,
+      payeeName,
       projectId: form.projectId || null,
       date: Timestamp.fromDate(new Date(form.date)),
     };
