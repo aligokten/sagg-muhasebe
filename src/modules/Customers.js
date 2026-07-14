@@ -737,6 +737,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
           accounts={accounts}
           customers={data.customers || []}
           projects={data.projects || []}
+          subcontractors={data.subcontractors || []}
           onClose={() => setEditIncomeExpense(null)}
         />
       )}
@@ -895,6 +896,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
           accounts={accounts}
           customers={data.customers || []}
           projects={data.projects || []}
+          subcontractors={data.subcontractors || []}
           onClose={() => setEditIncomeExpense(null)}
         />
       )}

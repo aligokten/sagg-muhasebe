@@ -10,7 +10,7 @@ import {
 import { CategorySelect } from '../categories';
 import ReceiptView from '../components/ReceiptView';
 
-export function EntryForm({ kind, existing, existingList, userId, accounts, customers, projects, onClose, onCreated }) {
+export function EntryForm({ kind, existing, existingList, userId, accounts, customers, projects, subcontractors = [], onClose, onCreated }) {
   const isIncome = kind === 'incomes';
   const [form, setForm] = useState(
     existing
@@ -20,21 +20,34 @@ export function EntryForm({ kind, existing, existingList, userId, accounts, cust
           category: existing.category || '',
           accountId: existing.accountId || '',
           customerId: existing.customerId || '',
+          contractorId: existing.contractorId || '',
           projectId: existing.projectId || '',
         }
-      : { date: todayInput(), category: '', description: '', amount: '', vatRate: 20, accountId: accounts[0]?.id || '', customerId: '', projectId: '' }
+      : { date: todayInput(), category: '', description: '', amount: '', vatRate: 20, accountId: accounts[0]?.id || '', customerId: '', contractorId: '', projectId: '' }
   );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const customerProjects = projects.filter((p) => p.customerId === form.customerId);
+
+  const partyValue = form.contractorId ? `s:${form.contractorId}` : form.customerId ? `c:${form.customerId}` : '';
+  const setParty = (e) => {
+    const v = e.target.value;
+    if (!v) { setForm({ ...form, customerId: '', contractorId: '', projectId: '' }); return; }
+    const [type, id] = v.split(':');
+    if (type === 's') setForm({ ...form, contractorId: id, customerId: '', projectId: '' });
+    else setForm({ ...form, customerId: id, contractorId: '', projectId: '' });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     if (!(Number(form.amount) > 0)) return;
     const customer = customers.find((c) => c.id === form.customerId);
+    const contractor = subcontractors.find((s) => s.id === form.contractorId);
     const payload = {
       ...form, amount: Number(form.amount), vatRate: Number(form.vatRate) || 0,
       accountId: form.accountId || null,
       customerId: form.customerId || null,
-      customerName: customer?.name || null,
+      contractorId: form.contractorId || null,
+      customerName: customer?.name || contractor?.name || null,
       projectId: form.projectId || null,
       date: Timestamp.fromDate(new Date(form.date)),
     };
@@ -53,7 +66,21 @@ export function EntryForm({ kind, existing, existingList, userId, accounts, cust
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Tarih"><Input type="date" name="date" value={form.date} onChange={set} required /></Field>
         <Field label="Kategori"><CategorySelect name="category" value={form.category} onChange={set} /></Field>
-        <Field label="Cari (opsiyonel)"><Select name="customerId" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, projectId: '' })}><option value="">Seçilmedi</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        {!isIncome && subcontractors.length > 0 ? (
+          <Field label="Cari / Taşeron (opsiyonel)">
+            <Select name="party" value={partyValue} onChange={setParty}>
+              <option value="">Seçilmedi</option>
+              <optgroup label="Cariler">
+                {customers.map((c) => <option key={`c:${c.id}`} value={`c:${c.id}`}>{c.name}</option>)}
+              </optgroup>
+              <optgroup label="Taşeronlar">
+                {subcontractors.map((s) => <option key={`s:${s.id}`} value={`s:${s.id}`}>{s.name}</option>)}
+              </optgroup>
+            </Select>
+          </Field>
+        ) : (
+          <Field label="Cari (opsiyonel)"><Select name="customerId" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value, contractorId: '', projectId: '' })}><option value="">Seçilmedi</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        )}
         {customerProjects.length > 0 ? (
           <Field label="İş / Proje"><Select name="projectId" value={form.projectId} onChange={set}><option value="">Genel</option>{customerProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         ) : <div />}
@@ -70,7 +97,7 @@ export function EntryForm({ kind, existing, existingList, userId, accounts, cust
 }
 
 export default function CashFlow({ data, userId }) {
-  const { expenses = [], incomes = [], accounts = [], customers = [], projects = [], companyProfile, scriptsLoaded } = data;
+  const { expenses = [], incomes = [], accounts = [], customers = [], projects = [], subcontractors = [], companyProfile, scriptsLoaded } = data;
   const [tab, setTab] = useState('expenses');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -145,6 +172,7 @@ export default function CashFlow({ data, userId }) {
           accounts={accounts}
           customers={customers}
           projects={projects}
+          subcontractors={subcontractors}
           onClose={() => { setFormOpen(false); setEditing(null); }}
           onCreated={(record) => setReceiptFor({ kind: tab, record })}
         />
