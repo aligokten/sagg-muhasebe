@@ -16,6 +16,8 @@ export const TX_CATEGORIES = [
   { single: 'Maaş' },
   { single: 'Kira' },
   { single: 'Yakıt / Ulaşım' },
+  { single: 'Nakliye' },
+  { single: 'Yemek' },
   { single: 'Vergi / SGK' },
   { single: 'Komisyon' },
   { single: 'Diğer' },
