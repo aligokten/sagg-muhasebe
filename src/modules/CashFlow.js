@@ -1,6 +1,6 @@
 // --- Gelir & Gider (kategori + cari ilişkili) ---
 import React, { useState, useMemo } from 'react';
-import { Edit, Trash2, TrendingUp, TrendingDown, Receipt as ReceiptIcon } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Receipt as ReceiptIcon, ReceiptText } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput, toInputDate, sum, vatFromGross, nextReceiptNo } from '../utils';
 import {
@@ -9,6 +9,7 @@ import {
 } from '../components/ui';
 import { CategorySelect } from '../categories';
 import ReceiptView from '../components/ReceiptView';
+import CashRegisterReceipt from '../components/CashRegisterReceipt';
 
 export function EntryForm({ kind, existing, existingList, userId, accounts, customers, projects, subcontractors = [], onClose, onCreated }) {
   const isIncome = kind === 'incomes';
@@ -105,6 +106,7 @@ export default function CashFlow({ data, userId }) {
   const [editing, setEditing] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const [receiptFor, setReceiptFor] = useState(null); // { kind, record }
+  const [cashRegFor, setCashRegFor] = useState(null); // { kind, record }
 
   const isIncome = tab === 'incomes';
   const list = useMemo(() => {
@@ -115,14 +117,17 @@ export default function CashFlow({ data, userId }) {
   const total = sum(list, (x) => x.amount);
   const accName = (id) => accounts.find((a) => a.id === id)?.name || '-';
 
-  const openReceipt = async (record) => {
+  const ensureReceiptNo = async (record) => {
     let receiptNo = record.receiptNo;
     if (!receiptNo) {
       receiptNo = nextReceiptNo(list, tab);
       await updateRecord(userId, tab, record.id, { receiptNo });
     }
-    setReceiptFor({ kind: tab, record: { ...record, receiptNo } });
+    return { ...record, receiptNo };
   };
+
+  const openReceipt = async (record) => setReceiptFor({ kind: tab, record: await ensureReceiptNo(record) });
+  const openCashReg = async (record) => setCashRegFor({ kind: tab, record: await ensureReceiptNo(record) });
 
   return (
     <div>
@@ -155,6 +160,7 @@ export default function CashFlow({ data, userId }) {
                 <Td align="right">
                   <div className="flex justify-end gap-1">
                     <button onClick={() => openReceipt(x)} title="Makbuz" className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><ReceiptIcon size={16} /></button>
+                    <button onClick={() => openCashReg(x)} title="Yazarkasa Fişi" className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><ReceiptText size={16} /></button>
                     <button onClick={() => { setEditing(x); setFormOpen(true); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-500"><Edit size={16} /></button>
                     <button onClick={() => setConfirmId(x.id)} className="p-2 rounded-full hover:bg-gray-200 text-red-500"><Trash2 size={16} /></button>
                   </div>
@@ -188,6 +194,16 @@ export default function CashFlow({ data, userId }) {
           accounts={accounts}
           scriptsLoaded={scriptsLoaded}
           onClose={() => setReceiptFor(null)}
+        />
+      )}
+      {cashRegFor && (
+        <CashRegisterReceipt
+          kind={cashRegFor.kind}
+          record={cashRegFor.record}
+          companyProfile={companyProfile}
+          accounts={accounts}
+          scriptsLoaded={scriptsLoaded}
+          onClose={() => setCashRegFor(null)}
         />
       )}
     </div>
