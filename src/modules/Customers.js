@@ -2,10 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote,
-  FolderKanban, HardHat, AudioLines, ListChecks, Link2, Unlink,
+  FolderKanban, HardHat, AudioLines, ListChecks, Link2, Unlink, Receipt as ReceiptIcon,
 } from 'lucide-react';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
-import { formatCurrency, formatDateShort, todayInput, toInputDate, toDate } from '../utils';
+import { formatCurrency, formatDateShort, todayInput, toInputDate, toDate, nextReceiptNo } from '../utils';
 import { downloadExcel } from '../exportExcel';
 import {
   cariMovements, allCariBalances,
@@ -20,6 +20,20 @@ import { BRANCHES } from './Authors';
 import { TRADES } from './Contractors';
 import { EntryForm as IncomeExpenseForm } from './CashFlow';
 import { CategorySelect } from '../categories';
+import ReceiptView from '../components/ReceiptView';
+
+// Cari hareket (tahsilat/ödeme/satış/alış) kaydına makbuz numarası atar ve
+// makbuz görünümü için gereken alanları (receiptKind) hazırlar.
+async function ensureTxReceipt(userId, t, transactions) {
+  let receiptNo = t.receiptNo;
+  if (!receiptNo) {
+    const seqKind = t.type === 'tahsilat' || t.cariEffect === 'borc' ? 'incomes' : 'expenses';
+    receiptNo = nextReceiptNo(transactions || [], seqKind);
+    await updateRecord(userId, 'transactions', t.id, { receiptNo });
+  }
+  const receiptKind = t.type === 'tahsilat' ? 'tahsilat' : t.type === 'odeme' ? 'odeme' : t.cariEffect === 'borc' ? 'satis' : 'alis';
+  return { ...t, receiptNo, receiptKind };
+}
 
 export const ROLE_OPTIONS = [
   { value: 'customer', label: 'Müşteri' },
@@ -489,7 +503,7 @@ function TransactionForm({ customer, existing, userId, accounts, projects, onClo
 // Fatura ve çek/senet kendi sayfalarında (Faturalar / Çek & Senet) yönetilir.
 const EDITABLE_REF_KINDS = ['transaction', 'income', 'expense'];
 
-function LedgerTable({ rows, showProject, onEdit, onDelete }) {
+function LedgerTable({ rows, showProject, onEdit, onDelete, onReceipt }) {
   const actions = !!(onEdit || onDelete);
   const headers = [
     { label: 'Tarih' }, { label: 'İşlem' }, { label: 'Açıklama' },
@@ -516,6 +530,7 @@ function LedgerTable({ rows, showProject, onEdit, onDelete }) {
               {EDITABLE_REF_KINDS.includes(r.ref?.kind) ? (
                 <ActionMenu
                   items={[
+                    ...(r.ref.kind === 'transaction' && onReceipt ? [{ label: 'Makbuz', icon: ReceiptIcon, onClick: () => onReceipt(r.ref) }] : []),
                     { label: 'Düzenle', icon: Edit, onClick: () => onEdit(r.ref) },
                     { label: 'Sil', icon: Trash2, danger: true, onClick: () => onDelete(r.ref) },
                   ]}
@@ -540,6 +555,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
   const [confirmTxId, setConfirmTxId] = useState(null);
   const [editIncomeExpense, setEditIncomeExpense] = useState(null); // { kind, record }
   const [confirmIncomeExpense, setConfirmIncomeExpense] = useState(null); // { kind, id }
+  const [receiptFor, setReceiptFor] = useState(null);
   const customerProjects = getCustomerProjects(customer.id, data);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const JobIcon = jobTypeMeta(project.jobType).icon;
@@ -554,6 +570,12 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
     if (ref.kind === 'transaction') setConfirmTxId(ref.id);
     else if (ref.kind === 'income') setConfirmIncomeExpense({ kind: 'incomes', id: ref.id });
     else if (ref.kind === 'expense') setConfirmIncomeExpense({ kind: 'expenses', id: ref.id });
+  };
+  const handleLedgerReceipt = async (ref) => {
+    const t = txById(ref.id);
+    if (!t) return;
+    const rec = await ensureTxReceipt(userId, t, data.transactions);
+    setReceiptFor({ ...rec, customerName: rec.customerName || customer.name });
   };
 
   const { rows, balance } = useMemo(() => cariMovements(customer.id, data, project.id), [customer, project, data]);
@@ -704,7 +726,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
 
       <Card title="Müşteri Hesap Ekstresi (bu iş)">
         {rows.length === 0 ? <EmptyState message="Bu iş için henüz hareket yok" /> : (
-          <LedgerTable rows={rows} showProject={false} onEdit={handleLedgerEdit} onDelete={handleLedgerDelete} />
+          <LedgerTable rows={rows} showProject={false} onEdit={handleLedgerEdit} onDelete={handleLedgerDelete} onReceipt={handleLedgerReceipt} />
         )}
       </Card>
 
@@ -748,6 +770,16 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
           onClose={() => setConfirmIncomeExpense(null)}
         />
       )}
+      {receiptFor && (
+        <ReceiptView
+          kind={receiptFor.receiptKind === 'odeme' || receiptFor.receiptKind === 'alis' ? 'expenses' : 'incomes'}
+          record={receiptFor}
+          companyProfile={data.companyProfile}
+          accounts={accounts}
+          scriptsLoaded={data.scriptsLoaded}
+          onClose={() => setReceiptFor(null)}
+        />
+      )}
     </div>
   );
 }
@@ -765,6 +797,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
   const [confirmTxId, setConfirmTxId] = useState(null);
   const [editIncomeExpense, setEditIncomeExpense] = useState(null); // { kind, record }
   const [confirmIncomeExpense, setConfirmIncomeExpense] = useState(null); // { kind, id }
+  const [receiptFor, setReceiptFor] = useState(null);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const isSupplierRole = customer.role === 'supplier' || customer.role === 'both';
 
@@ -777,6 +810,12 @@ function CustomerDetail({ customer, data, userId, onBack }) {
     if (ref.kind === 'transaction') setConfirmTxId(ref.id);
     else if (ref.kind === 'income') setConfirmIncomeExpense({ kind: 'incomes', id: ref.id });
     else if (ref.kind === 'expense') setConfirmIncomeExpense({ kind: 'expenses', id: ref.id });
+  };
+  const handleLedgerReceipt = async (ref) => {
+    const t = txById(ref.id);
+    if (!t) return;
+    const rec = await ensureTxReceipt(userId, t, data.transactions);
+    setReceiptFor({ ...rec, customerName: rec.customerName || customer.name });
   };
 
   const customerProjects = useMemo(() => getCustomerProjects(customer.id, data), [data, customer.id]);
@@ -868,7 +907,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         {rows.length === 0 ? (
           <EmptyState message="Bu cari için henüz hareket yok" />
         ) : (
-          <LedgerTable rows={rows} showProject={customerProjects.length > 0} onEdit={handleLedgerEdit} onDelete={handleLedgerDelete} />
+          <LedgerTable rows={rows} showProject={customerProjects.length > 0} onEdit={handleLedgerEdit} onDelete={handleLedgerDelete} onReceipt={handleLedgerReceipt} />
         )}
       </Card>
 
@@ -905,6 +944,16 @@ function CustomerDetail({ customer, data, userId, onBack }) {
           message={`Bu ${confirmIncomeExpense.kind === 'incomes' ? 'geliri' : 'gideri'} silmek istediğinize emin misiniz?`}
           onConfirm={() => deleteRecord(userId, confirmIncomeExpense.kind, confirmIncomeExpense.id)}
           onClose={() => setConfirmIncomeExpense(null)}
+        />
+      )}
+      {receiptFor && (
+        <ReceiptView
+          kind={receiptFor.receiptKind === 'odeme' || receiptFor.receiptKind === 'alis' ? 'expenses' : 'incomes'}
+          record={receiptFor}
+          companyProfile={data.companyProfile}
+          accounts={accounts}
+          scriptsLoaded={data.scriptsLoaded}
+          onClose={() => setReceiptFor(null)}
         />
       )}
     </div>

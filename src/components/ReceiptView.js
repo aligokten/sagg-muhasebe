@@ -22,14 +22,25 @@ const paymentLabel = (accounts, accountId) => {
   return 'Havale/EFT';
 };
 
+// receiptKind: cari hesap ekstresindeki "Hareket" kayıtları için 4 varyant.
+// Belirtilmezse (gelir/gider/maaş makbuzları) mevcut kind/isPersonnel mantığına düşer.
+const RECEIPT_KIND_META = {
+  tahsilat: { title: 'TAHSİLAT MAKBUZU', verb: 'tahsil edilmiştir', showPayment: true, leftSign: 'TESLİM EDEN (Ödeyen)', rightSign: 'TESLİM ALAN (Yetkili)' },
+  odeme: { title: 'ÖDEME MAKBUZU', verb: 'ödenmiştir', showPayment: true, leftSign: 'ÖDEYEN (Yetkili)', rightSign: 'TESLİM ALAN (Alacaklı)' },
+  satis: { title: 'SATIŞ İŞLEM MAKBUZU', verb: 'cari hesaba borç olarak işlenmiştir', showPayment: false, leftSign: 'DÜZENLEYEN (Yetkili)', rightSign: 'ONAYLAYAN (Cari)' },
+  alis: { title: 'ALIŞ İŞLEM MAKBUZU', verb: 'cari hesaba alacak olarak işlenmiştir', showPayment: false, leftSign: 'DÜZENLEYEN (Yetkili)', rightSign: 'ONAYLAYAN (Cari)' },
+};
+
 const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, accounts, qrDataUrl }) => {
   const isIncome = kind === 'incomes';
   const isPersonnel = !!record.isPersonnel;
-  const title = isPersonnel ? 'MAAŞ ÖDEME MAKBUZU' : isIncome ? 'TAHSİLAT MAKBUZU' : 'ÖDEME MAKBUZU';
-  const verb = isIncome ? 'tahsil edilmiştir' : 'ödenmiştir';
+  const kindMeta = RECEIPT_KIND_META[record.receiptKind];
+  const title = isPersonnel ? 'MAAŞ ÖDEME MAKBUZU' : kindMeta ? kindMeta.title : isIncome ? 'TAHSİLAT MAKBUZU' : 'ÖDEME MAKBUZU';
+  const verb = kindMeta ? kindMeta.verb : isIncome ? 'tahsil edilmiştir' : 'ödenmiştir';
+  const showPayment = kindMeta ? kindMeta.showPayment : true;
   const partyName = record.payeeName || record.customerName || '..........................................';
-  const leftSign = isPersonnel ? 'ÖDEYEN (Yetkili)' : isIncome ? 'TESLİM EDEN (Ödeyen)' : 'ÖDEYEN (Yetkili)';
-  const rightSign = isPersonnel ? 'TESLİM ALAN (Personel)' : isIncome ? 'TESLİM ALAN (Yetkili)' : 'TESLİM ALAN (Alacaklı)';
+  const leftSign = isPersonnel ? 'ÖDEYEN (Yetkili)' : kindMeta ? kindMeta.leftSign : isIncome ? 'TESLİM EDEN (Ödeyen)' : 'ÖDEYEN (Yetkili)';
+  const rightSign = isPersonnel ? 'TESLİM ALAN (Personel)' : kindMeta ? kindMeta.rightSign : isIncome ? 'TESLİM ALAN (Yetkili)' : 'TESLİM ALAN (Alacaklı)';
 
   return (
     <div
@@ -57,7 +68,9 @@ const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, account
         <div className="text-[11px] space-y-1.5">
           <p><span className="text-gray-500">Sayın:</span> <span className="font-semibold">{partyName}</span></p>
           <p className="text-gray-600 leading-snug">
-            Aşağıda cins ve tutarı belirtilen bedel {paymentLabel(accounts, record.accountId)} yoluyla {verb}.
+            {showPayment
+              ? `Aşağıda cins ve tutarı belirtilen bedel ${paymentLabel(accounts, record.accountId)} yoluyla ${verb}.`
+              : `Aşağıda cins ve tutarı belirtilen bedel ${verb}.`}
           </p>
         </div>
 
@@ -66,14 +79,6 @@ const ReceiptCopy = ({ copyLabel, divider, kind, record, companyProfile, account
           <p><span className="text-gray-500">Tutar (Rakam):</span> <span className="font-bold">{formatCurrency(record.amount)}</span></p>
           <p><span className="text-gray-500">Tutar (Yazı):</span> {numberToWordsTr(record.amount)}</p>
         </div>
-
-        {!isPersonnel && (
-          <div className="mt-1.5 text-[10px] text-gray-400">
-            Not:
-            <div className="border-b border-gray-300 mt-1.5" />
-            <div className="border-b border-gray-300 mt-2" />
-          </div>
-        )}
 
         <div className="mt-auto pt-3 flex items-start gap-3">
           {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: 68, height: 68, flexShrink: 0 }} />}
@@ -104,9 +109,10 @@ export default function ReceiptView({ kind, record, companyProfile, accounts, on
 
   useEffect(() => {
     let cancelled = false;
+    const kindMeta = RECEIPT_KIND_META[record.receiptKind];
     const lines = [
       companyProfile?.companyName || 'SAGG Muhasebe',
-      isIncome ? 'Tahsilat Makbuzu' : 'Ödeme Makbuzu',
+      record.isPersonnel ? 'Maaş Ödeme Makbuzu' : kindMeta ? kindMeta.title : isIncome ? 'Tahsilat Makbuzu' : 'Ödeme Makbuzu',
       `Seri No: ${record.receiptNo || ''}`,
       `Tarih: ${formatDate(record.date)}`,
       `Tutar: ${formatCurrency(record.amount)}`,
