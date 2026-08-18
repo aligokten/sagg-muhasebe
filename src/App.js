@@ -12,11 +12,11 @@ import {
   subscribeSubscription, createTrialSubscription, subscribeAllPaymentRequests, ADMIN_EMAIL,
 } from './firebase';
 import { Spinner } from './components/ui';
-import { toDate, daysBetween } from './utils';
+import { toDate, daysBetween, sortByName } from './utils';
 import AuthModal from './components/AuthModal';
 import PaymentOptions from './components/PaymentOptions';
 import Topbar from './components/Topbar';
-import { COLLECTIONS, RENEWAL_REMINDER_DAYS } from './constants';
+import { COLLECTIONS, NAME_SORTED_COLLECTIONS, RENEWAL_REMINDER_DAYS } from './constants';
 import AdminSubscriptions from './modules/AdminSubscriptions';
 
 import Dashboard from './modules/Dashboard';
@@ -328,7 +328,10 @@ export default function App() {
     );
   }
 
+  // Ada göre listelenen koleksiyonlar her yerde (listeler ve açılır menüler)
+  // alfabetik sırayla görünsün diye merkezî olarak sıralanır.
   const fullData = { ...data, scriptsLoaded };
+  NAME_SORTED_COLLECTIONS.forEach((name) => { fullData[name] = sortByName(data[name]); });
 
   const renderPage = () => {
     switch (currentPage) {

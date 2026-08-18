@@ -6,7 +6,7 @@ import {
   FileUp, CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { addRecord, addRecordsBatch, updateRecord, deleteRecord, Timestamp } from '../firebase';
-import { formatCurrency, formatDateShort, todayInput, toInputDate, toDate, nextReceiptNo } from '../utils';
+import { formatCurrency, formatDateShort, todayInput, toInputDate, toDate, nextReceiptNo, sortByName } from '../utils';
 import { parseDefterPdf, toTransactionPayload } from '../importDefterPdf';
 import { downloadExcel } from '../exportExcel';
 import {
@@ -63,7 +63,7 @@ const getCustomerProjects = (customerId, data) => {
   const linked = (data.projects || [])
     .filter((p) => linkedIds.includes(p.id) && p.customerId !== customerId)
     .map((p) => ({ ...p, _linked: true }));
-  return [...owned, ...linked];
+  return sortByName([...owned, ...linked]);
 };
 
 const balanceBadge = (bal) => {
