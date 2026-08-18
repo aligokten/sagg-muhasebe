@@ -18,6 +18,7 @@ import {
   updateDoc,
   getDocs,
   getDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { COLLECTIONS } from './constants';
 
@@ -53,6 +54,24 @@ export const docRef = (userId, name, id) => doc(db, colPath(userId, name), id);
 // --- Genel CRUD yardımcıları ---
 export const addRecord = (userId, name, data) =>
   addDoc(colRef(userId, name), { ...data, createdAt: Timestamp.now() });
+
+// Çok sayıda kaydı toplu yazar (PDF içe aktarma gibi). Firestore toplu yazma
+// sınırı 500 işlemdir; güvenli olsun diye 400'lük parçalara bölünür.
+// onProgress(yazılan, toplam) ile ilerleme bildirilir.
+export const addRecordsBatch = async (userId, name, records, onProgress) => {
+  const CHUNK = 400;
+  const ref = colRef(userId, name);
+  let written = 0;
+  for (let i = 0; i < records.length; i += CHUNK) {
+    const slice = records.slice(i, i + CHUNK);
+    const batch = writeBatch(db);
+    slice.forEach((r) => batch.set(doc(ref), { ...r, createdAt: Timestamp.now() }));
+    await batch.commit();
+    written += slice.length;
+    onProgress && onProgress(written, records.length);
+  }
+  return written;
+};
 
 export const updateRecord = (userId, name, id, data) =>
   updateDoc(docRef(userId, name, id), data);

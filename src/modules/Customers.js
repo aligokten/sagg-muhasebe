@@ -3,9 +3,11 @@ import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote,
   FolderKanban, HardHat, AudioLines, ListChecks, Link2, Unlink, Receipt as ReceiptIcon,
+  FileUp, CheckCircle2, AlertTriangle,
 } from 'lucide-react';
-import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
+import { addRecord, addRecordsBatch, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput, toInputDate, toDate, nextReceiptNo } from '../utils';
+import { parseDefterPdf, toTransactionPayload } from '../importDefterPdf';
 import { downloadExcel } from '../exportExcel';
 import {
   cariMovements, allCariBalances,
@@ -13,7 +15,7 @@ import {
 } from '../finance';
 import {
   PageHeader, AddButton, Card, Table, Td, Badge, EmptyState, StatCard,
-  FormModal, ConfirmDialog, Button, Field, Input, Select, Textarea, ActionMenu,
+  FormModal, Modal, ConfirmDialog, Button, Field, Input, Select, Textarea, ActionMenu,
 } from '../components/ui';
 import QuickEntry from '../components/QuickEntry';
 import { BRANCHES } from './Authors';
@@ -439,6 +441,252 @@ function ContractorPaymentForm({ assignment, userId, accounts, onClose }) {
   );
 }
 
+// --- Defter.net hesap dökümü (PDF) içe aktarma ---
+function PdfImportForm({ customer, data, userId, accounts, projects, onClose }) {
+  const [stage, setStage] = useState('pick'); // pick | parsing | preview | saving | done
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+  const [fileName, setFileName] = useState('');
+  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
+  const [projectId, setProjectId] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [saved, setSaved] = useState(0);
+
+  const alreadyImported = (data.transactions || []).filter(
+    (t) => t.customerId === customer.id && t.importSource === 'defter-pdf'
+  ).length;
+
+  const pickFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setError('');
+    setStage('parsing');
+    try {
+      const res = await parseDefterPdf(file);
+      if (!res.rows.length) {
+        setError(res.warnings[0] || 'PDF içinde hareket bulunamadı.');
+        setStage('pick');
+        return;
+      }
+      // PDF'teki hesap adını ("Nakit (Kasa)") uygulamadaki kasayla eşleştir
+      const pdfAcct = res.rows.find((r) => r.accountName)?.accountName;
+      if (pdfAcct) {
+        const norm = (s) => s.toLocaleLowerCase('tr-TR').replace(/[\s()]/g, '');
+        const hit = accounts.find((a) => norm(a.name) === norm(pdfAcct))
+          || accounts.find((a) => norm(a.name).includes(norm(pdfAcct)) || norm(pdfAcct).includes(norm(a.name)));
+        if (hit) setAccountId(hit.id);
+      }
+      setResult(res);
+      setStage('preview');
+    } catch (err) {
+      console.error(err);
+      setError('PDF okunamadı. Dosyanın Defter hesap dökümü olduğundan emin olun.');
+      setStage('pick');
+    }
+  };
+
+  const doImport = async () => {
+    setStage('saving');
+    try {
+      const payloads = result.rows.map((r) => ({
+        ...toTransactionPayload(r, customer, accountId),
+        projectId: projectId || null,
+        date: Timestamp.fromDate(r.date),
+        importedAt: Timestamp.now(),
+        importFileName: fileName,
+      }));
+      await addRecordsBatch(userId, 'transactions', payloads, (n, total) => setProgress(Math.round((n / total) * 100)));
+      setSaved(payloads.length);
+      setStage('done');
+    } catch (err) {
+      console.error(err);
+      setError('Kayıt sırasında hata oluştu: ' + (err.message || ''));
+      setStage('preview');
+    }
+  };
+
+  const nameMismatch =
+    result?.customerName &&
+    result.customerName.toLocaleLowerCase('tr-TR').trim() !== customer.name.toLocaleLowerCase('tr-TR').trim();
+
+  const near = (a, b) => a != null && b != null && Math.abs(a - b) < 0.01;
+  const checksumOk =
+    result?.pdfTotals &&
+    near(result.totals.borc, result.pdfTotals.borc) &&
+    near(result.totals.alacak, result.pdfTotals.alacak);
+
+  const dateRange = result?.rows.length
+    ? `${formatDateShort(result.rows[0].date)} — ${formatDateShort(result.rows[result.rows.length - 1].date)}`
+    : '';
+  const usesAccount = !!result?.rows.some((r) => r.type === 'TAHSİLAT' || r.type === 'ÖDEME');
+
+  const footer =
+    stage === 'preview' ? (
+      <>
+        <Button type="button" variant="secondary" onClick={onClose}>İptal</Button>
+        <Button type="button" onClick={doImport}>{result.rows.length} Hareketi İçe Aktar</Button>
+      </>
+    ) : stage === 'done' ? (
+      <Button type="button" onClick={onClose}>Kapat</Button>
+    ) : (
+      <Button type="button" variant="secondary" onClick={onClose}>Kapat</Button>
+    );
+
+  return (
+    <Modal title={`${customer.name} — PDF'ten Veri İçe Aktar`} size="2xl" onClose={onClose} footer={footer}>
+      {error && (
+        <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm">
+          <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />{error}
+        </div>
+      )}
+
+      {stage === 'pick' && (
+        <div>
+          <p className="text-sm text-gray-600 mb-4">
+            Defter.net uygulamasından aldığınız <b>hesap dökümü</b> PDF dosyasını seçin. Dosyadaki tüm hareketler
+            (tarih, işlem türü, açıklama, hesap, miktar) bu carinin hesabına aktarılır.
+          </p>
+          {alreadyImported > 0 && (
+            <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm">
+              <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
+              Bu cariye daha önce PDF'ten <b>{alreadyImported}</b> hareket aktarılmış. Aynı dosyayı tekrar aktarırsanız
+              kayıtlar iki kez görünür.
+            </div>
+          )}
+          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-orange-400 hover:bg-orange-50">
+            <FileUp size={32} className="text-orange-600" />
+            <span className="text-sm font-medium text-gray-700">PDF dosyası seçin</span>
+            <span className="text-xs text-gray-400">Defter hesap dökümü (.pdf)</span>
+            <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={pickFile} />
+          </label>
+        </div>
+      )}
+
+      {stage === 'parsing' && <p className="text-center text-gray-500 py-10">PDF okunuyor…</p>}
+
+      {stage === 'saving' && (
+        <div className="py-10 text-center">
+          <p className="text-gray-600 mb-3">Hareketler kaydediliyor… %{progress}</p>
+          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div className="bg-orange-600 h-2 transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
+
+      {stage === 'done' && (
+        <div className="py-10 text-center">
+          <CheckCircle2 size={40} className="text-green-600 mx-auto mb-3" />
+          <p className="text-gray-800 font-semibold">{saved} hareket başarıyla içe aktarıldı.</p>
+          <p className="text-sm text-gray-500 mt-1">Hesap ekstresinde görüntüleyebilirsiniz.</p>
+        </div>
+      )}
+
+      {stage === 'preview' && result && (
+        <div>
+          {nameMismatch && (
+            <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm">
+              <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
+              PDF'teki cari adı <b>{result.customerName}</b>, seçili cari ise <b>{customer.name}</b>. Yanlış cariye
+              aktarmadığınızdan emin olun.
+            </div>
+          )}
+          {result.warnings.map((w, i) => (
+            <div key={i} className="mb-2 flex items-start gap-2 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm">
+              <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />{w}
+            </div>
+          ))}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="p-3 rounded-lg bg-gray-50">
+              <p className="text-xs text-gray-500">Hareket</p>
+              <p className="text-lg font-bold text-gray-800">{result.rows.length}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-50">
+              <p className="text-xs text-gray-500">Toplam Borç</p>
+              <p className="text-lg font-bold text-red-600">{formatCurrency(result.totals.borc)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-50">
+              <p className="text-xs text-gray-500">Toplam Alacak</p>
+              <p className="text-lg font-bold text-green-600">{formatCurrency(result.totals.alacak)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-50">
+              <p className="text-xs text-gray-500">Bakiye</p>
+              <p className={`text-lg font-bold ${result.totals.balance >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {formatCurrency(Math.abs(result.totals.balance))} {result.totals.balance >= 0 ? '(B)' : '(A)'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 mb-4">
+            <span>Dosya: <b className="text-gray-700">{fileName}</b></span>
+            <span>Tarih aralığı: <b className="text-gray-700">{dateRange}</b></span>
+            {result.pdfTotals && (
+              <span className={checksumOk ? 'text-green-600' : 'text-yellow-700'}>
+                {checksumOk ? '✓ PDF toplamlarıyla birebir uyuşuyor' : '⚠ PDF toplamlarıyla farklı, kontrol edin'}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            {usesAccount && (
+              <Field label="Tahsilat/ödemeler hangi kasaya işlensin?">
+                <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                  <option value="">Belirtilmedi</option>
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </Select>
+              </Field>
+            )}
+            {projects.length > 0 && (
+              <Field label="İş / Proje (opsiyonel)">
+                <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                  <option value="">Genel (işe bağlı değil)</option>
+                  {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+              </Field>
+            )}
+          </div>
+
+          <p className="text-xs font-medium text-gray-500 mb-2">Önizleme (tüm satırlar aktarılacak)</p>
+          <div className="border rounded-lg overflow-auto" style={{ maxHeight: '18rem' }}>
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr className="text-xs text-gray-500 uppercase">
+                  <th className="px-3 py-2 text-left">Tarih</th>
+                  <th className="px-3 py-2 text-left">İşlem</th>
+                  <th className="px-3 py-2 text-left">Kategori</th>
+                  <th className="px-3 py-2 text-left">Açıklama</th>
+                  <th className="px-3 py-2 text-left">Hesap</th>
+                  <th className="px-3 py-2 text-right">Tutar</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {result.rows.map((r, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.dateText}</td>
+                    <td className="px-3 py-1.5">
+                      <Badge color={r.type === 'SATIŞ' ? 'red' : r.type === 'TAHSİLAT' ? 'sky' : 'green'}>{r.type}</Badge>
+                    </td>
+                    <td className="px-3 py-1.5 text-gray-600">{r.category || '-'}</td>
+                    <td className="px-3 py-1.5 text-gray-600">{r.description || '-'}</td>
+                    <td className="px-3 py-1.5 text-gray-400">{r.accountName || '-'}</td>
+                    <td className={`px-3 py-1.5 text-right font-medium whitespace-nowrap ${r.type === 'SATIŞ' ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatCurrency(r.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            SATIŞ hareketleri cariye <b>borç</b>, ALIŞ ve TAHSİLAT hareketleri <b>alacak</b> olarak işlenir.
+          </p>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 // --- Hareket (tahsilat/ödeme/manuel) düzenleme formu ---
 function TransactionForm({ customer, existing, userId, accounts, projects, onClose }) {
   const initialAction = existing.type === 'tahsilat' ? 'tahsilat'
@@ -798,6 +1046,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
   const [editIncomeExpense, setEditIncomeExpense] = useState(null); // { kind, record }
   const [confirmIncomeExpense, setConfirmIncomeExpense] = useState(null); // { kind, id }
   const [receiptFor, setReceiptFor] = useState(null);
+  const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const isSupplierRole = customer.role === 'supplier' || customer.role === 'both';
 
@@ -851,6 +1100,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         <div className="flex gap-2 items-start flex-wrap">
           <Button icon={Wallet} variant="success" onClick={() => setPayment('tahsilat')}>Tahsilat</Button>
           <Button icon={HandCoins} variant="danger" onClick={() => setPayment('odeme')}>Ödeme</Button>
+          <Button icon={FileUp} variant="secondary" onClick={() => setPdfImportOpen(true)}>PDF'ten İçe Aktar</Button>
           <Button icon={Download} variant="secondary" onClick={exportEkstre}>Excel'e Aktar</Button>
         </div>
       </div>
@@ -912,6 +1162,16 @@ function CustomerDetail({ customer, data, userId, onBack }) {
       </Card>
 
       {payment && <PaymentForm type={payment === 'tahsilat' ? 'tahsilat' : 'odeme'} customer={customer} userId={userId} accounts={accounts} projects={customerProjects} onClose={() => setPayment(null)} />}
+      {pdfImportOpen && (
+        <PdfImportForm
+          customer={customer}
+          data={data}
+          userId={userId}
+          accounts={accounts}
+          projects={customerProjects}
+          onClose={() => setPdfImportOpen(false)}
+        />
+      )}
       {projectFormOpen && <ProjectForm customerId={customer.id} userId={userId} onClose={() => setProjectFormOpen(false)} />}
       {linkFormOpen && (
         <JobLinkForm
