@@ -6,6 +6,13 @@ export const COLLECTIONS = [
   'subcontractors', 'contractorAssignments', 'projectLinks', 'zReports',
 ];
 
+// "name" alanına göre alfabetik listelenen koleksiyonlar (cari, müellif,
+// taşeron, personel, ürün, kasa/banka, iş/proje). Belge ve hareket
+// koleksiyonları tarih/numara sırasında kaldığı için buraya dahil değildir.
+export const NAME_SORTED_COLLECTIONS = [
+  'customers', 'authors', 'subcontractors', 'personnel', 'products', 'accounts', 'projects',
+];
+
 // Abonelik paketi seçenekleri (müşteri seçimi + yönetici fiyatlandırması ortak anahtarları)
 export const PLAN_OPTIONS = [
   { key: '1m', label: 'Aylık' },

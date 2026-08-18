@@ -132,6 +132,14 @@ export const vatFromGross = (gross, rate) =>
 
 export const sum = (arr, fn) => (arr || []).reduce((s, x) => s + (Number(fn(x)) || 0), 0);
 
+// Türkçe alfabetik karşılaştırma (ç, ğ, ı/İ, ö, ş, ü doğru sıralanır).
+export const compareTr = (a, b) =>
+  String(a ?? '').localeCompare(String(b ?? ''), 'tr', { sensitivity: 'base', numeric: true });
+
+// Listeyi ada (ya da verilen alana) göre alfabetik sıralar; yeni dizi döner.
+export const sortByName = (list, field = 'name') =>
+  [...(list || [])].sort((a, b) => compareTr(a?.[field], b?.[field]));
+
 // Fatura/teklif kalemlerinden toplamları hesaplar
 export const computeTotals = (items) => {
   let subTotal = 0;
