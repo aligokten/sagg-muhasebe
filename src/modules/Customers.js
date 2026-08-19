@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft, Edit, Trash2, Wallet, HandCoins, Download, Users, Briefcase, PlusCircle, DraftingCompass, Banknote,
   FolderKanban, HardHat, AudioLines, ListChecks, Link2, Unlink, Receipt as ReceiptIcon,
-  FileUp, CheckCircle2, AlertTriangle,
+  FileUp, CheckCircle2, AlertTriangle, FileText,
 } from 'lucide-react';
 import { addRecord, addRecordsBatch, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatDateShort, todayInput, toInputDate, toDate, nextReceiptNo, sortByName } from '../utils';
@@ -23,6 +23,7 @@ import { TRADES } from './Contractors';
 import { EntryForm as IncomeExpenseForm } from './CashFlow';
 import { CategorySelect } from '../categories';
 import ReceiptView from '../components/ReceiptView';
+import LedgerReport from '../components/LedgerReport';
 
 // Cari hareket (tahsilat/ödeme/satış/alış) kaydına makbuz numarası atar ve
 // makbuz görünümü için gereken alanları (receiptKind) hazırlar.
@@ -82,7 +83,8 @@ function exportLedgerExcel(heading, customer, rows, balance, showProject, filena
   const totalBorc = rows.reduce((s, r) => s + r.borc, 0);
   const totalAlacak = rows.reduce((s, r) => s + r.alacak, 0);
   const headers = ['Tarih', 'İşlem', 'Açıklama', ...(showProject ? ['İş/Proje'] : []), 'Borç', 'Alacak', 'Bakiye', 'Durum'];
-  const dataRows = rows.map((r) => [
+  // Ekrandaki ekstre ile aynı sıra: en yeni işlem en üstte
+  const dataRows = [...rows].reverse().map((r) => [
     formatDateShort(r.date), r.type,
     r.description + (r.category ? ` (${r.category})` : ''),
     ...(showProject ? [r.projectName || 'Genel'] : []),
@@ -759,9 +761,12 @@ function LedgerTable({ rows, showProject, onEdit, onDelete, onReceipt }) {
     { label: 'Borç', align: 'right' }, { label: 'Alacak', align: 'right' }, { label: 'Bakiye', align: 'right' },
     ...(actions ? [{ label: '' }] : []),
   ];
+  // Yürüyen bakiye eskiden yeniye hesaplanır; ekranda en yeni işlem üstte olacak
+  // şekilde ters sırada gösterilir (bakiye değerleri değişmez).
+  const display = [...rows].reverse();
   return (
     <Table headers={headers}>
-      {rows.map((r, i) => (
+      {display.map((r, i) => (
         <tr key={i} className="hover:bg-gray-50">
           <Td className="text-gray-500">{formatDateShort(r.date)}</Td>
           <Td><Badge color={r.borc ? 'red' : 'green'}>{r.type}</Badge></Td>
@@ -804,6 +809,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
   const [editIncomeExpense, setEditIncomeExpense] = useState(null); // { kind, record }
   const [confirmIncomeExpense, setConfirmIncomeExpense] = useState(null); // { kind, id }
   const [receiptFor, setReceiptFor] = useState(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const customerProjects = getCustomerProjects(customer.id, data);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const JobIcon = jobTypeMeta(project.jobType).icon;
@@ -875,6 +881,7 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
           {project.description && <p className="text-sm text-gray-500 mt-1">{project.description}</p>}
         </div>
         <div className="flex gap-2 items-start flex-wrap">
+          <Button icon={FileText} variant="secondary" onClick={() => setReportOpen(true)}>PDF Rapor</Button>
           <Button icon={Download} variant="secondary" onClick={() => exportLedgerExcel(`${project.name} — İŞ EKSTRESİ`, customer, rows, balance, false, `${customer.name}-${project.name}-ekstre`)}>Excel'e Aktar</Button>
           <Button icon={Edit} variant="secondary" onClick={() => setEditOpen(true)}>İşi Düzenle</Button>
         </div>
@@ -1028,6 +1035,19 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
           onClose={() => setReceiptFor(null)}
         />
       )}
+      {reportOpen && (
+        <LedgerReport
+          heading="İŞ EKSTRESİ"
+          customer={customer}
+          project={project}
+          rows={rows}
+          balance={balance}
+          showProject={false}
+          companyProfile={data.companyProfile}
+          scriptsLoaded={data.scriptsLoaded}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1046,6 +1066,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
   const [editIncomeExpense, setEditIncomeExpense] = useState(null); // { kind, record }
   const [confirmIncomeExpense, setConfirmIncomeExpense] = useState(null); // { kind, id }
   const [receiptFor, setReceiptFor] = useState(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
   const isSupplierRole = customer.role === 'supplier' || customer.role === 'both';
@@ -1100,6 +1121,7 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         <div className="flex gap-2 items-start flex-wrap">
           <Button icon={Wallet} variant="success" onClick={() => setPayment('tahsilat')}>Tahsilat</Button>
           <Button icon={HandCoins} variant="danger" onClick={() => setPayment('odeme')}>Ödeme</Button>
+          <Button icon={FileText} variant="secondary" onClick={() => setReportOpen(true)}>PDF Rapor</Button>
           <Button icon={FileUp} variant="secondary" onClick={() => setPdfImportOpen(true)}>PDF'ten İçe Aktar</Button>
           <Button icon={Download} variant="secondary" onClick={exportEkstre}>Excel'e Aktar</Button>
         </div>
@@ -1214,6 +1236,18 @@ function CustomerDetail({ customer, data, userId, onBack }) {
           accounts={accounts}
           scriptsLoaded={data.scriptsLoaded}
           onClose={() => setReceiptFor(null)}
+        />
+      )}
+      {reportOpen && (
+        <LedgerReport
+          heading="HESAP EKSTRESİ"
+          customer={customer}
+          rows={rows}
+          balance={balance}
+          showProject={customerProjects.length > 0}
+          companyProfile={data.companyProfile}
+          scriptsLoaded={data.scriptsLoaded}
+          onClose={() => setReportOpen(false)}
         />
       )}
     </div>
