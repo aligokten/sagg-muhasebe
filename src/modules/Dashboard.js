@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import {
   ArrowUpRight, ArrowDownRight, Download, Filter,
-  Wallet, FileText, AlertTriangle, TrendingDown, TrendingUp, Quote,
+  Wallet, FileText, AlertTriangle, TrendingDown, TrendingUp, Quote, X,
 } from 'lucide-react';
 import { formatCurrency, monthKey, monthLabel, toDate, formatDateShort, sum } from '../utils';
 import { allCariBalances, allAccountBalances, allProductStocks } from '../finance';
@@ -25,6 +25,55 @@ const TAG_COLOR = {
   'Gider': 'bg-amber-100 text-amber-700',
   'Virman': 'bg-gray-100 text-gray-700',
   'Cari Hareket': 'bg-blue-100 text-blue-700',
+};
+
+// İşlem detayı: cam efektli (glassmorphism) kart, arka plan bulanıklaştırılır.
+const TxDetailModal = ({ item, onClose }) => {
+  if (!item) return null;
+  const fields = Object.entries(item.detail || {}).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/30 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-3xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-gray-800/50 backdrop-blur-2xl shadow-2xl p-6 text-gray-800 dark:text-gray-100"
+        style={{ boxShadow: '0 8px 32px rgba(31,38,135,0.25)' }}
+      >
+        {/* Cam üstü parlaklık */}
+        <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-white/50 to-transparent dark:from-white/10" />
+        <button
+          onClick={onClose}
+          aria-label="Kapat"
+          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center bg-white/50 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20 text-gray-600 dark:text-gray-200"
+        >
+          <X size={16} />
+        </button>
+
+        <div className="relative">
+          <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${TAG_COLOR[item.tag] || 'bg-orange-100 text-orange-700'}`}>{item.tag}</span>
+          <h3 className="mt-3 text-lg font-semibold leading-tight">{item.name || '—'}</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{formatDateShort(item.date)}</p>
+
+          <p className={`mt-4 text-3xl font-bold ${item.neg ? 'text-rose-600' : 'text-emerald-600'}`}>
+            {item.neg ? '-' : ''}{formatCurrency(item.amount)}
+          </p>
+
+          {fields.length > 0 && (
+            <dl className="mt-5 space-y-2 border-t border-white/50 dark:border-white/10 pt-4">
+              {fields.map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-4 text-sm">
+                  <dt className="text-gray-500 dark:text-gray-400 flex-shrink-0">{k}</dt>
+                  <dd className="font-medium text-right break-words">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const ChangeBadge = ({ value, light }) => {
@@ -83,6 +132,7 @@ const monthChange = (records, getDate, getAmt) => {
 export default function Dashboard({ data, setPage }) {
   const { invoices = [], expenses = [], incomes = [], customers = [], products = [], accounts = [], transactions = [] } = data;
   const [period, setPeriod] = useState('month');
+  const [detailTx, setDetailTx] = useState(null);
 
   const cariBalances = useMemo(() => allCariBalances(data), [data]);
   const accBalances = useMemo(() => allAccountBalances(data), [data]);
@@ -120,20 +170,42 @@ export default function Dashboard({ data, setPage }) {
 
   // Son işlemler (faturalar, tahsilat/ödeme, gelir/gider, virman, manuel cari hareket)
   const recent = useMemo(() => {
+    const accName = (id) => accounts.find((a) => a.id === id)?.name || null;
+    const projName = (id) => (data.projects || []).find((p) => p.id === id)?.name || null;
     const items = [
-      ...salesInv.map((i) => ({ name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Satış', neg: false, date: toDate(i.date) })),
-      ...purchInv.map((i) => ({ name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Alış', neg: true, date: toDate(i.date) })),
+      ...salesInv.map((i) => ({
+        name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Satış', neg: false, date: toDate(i.date),
+        detail: { 'Belge No': i.docNumber, 'Vade': i.dueDate ? formatDateShort(i.dueDate) : null, 'Durum': i.status === 'paid' ? 'Ödendi' : 'Ödenmedi', 'KDV': formatCurrency(i.vatTotal), 'Kalem Sayısı': (i.items || []).length || null, 'İş / Proje': projName(i.projectId) },
+      })),
+      ...purchInv.map((i) => ({
+        name: i.customerSnapshot?.name, doc: i.docNumber, amount: i.grandTotal, tag: 'Alış', neg: true, date: toDate(i.date),
+        detail: { 'Belge No': i.docNumber, 'Vade': i.dueDate ? formatDateShort(i.dueDate) : null, 'Durum': i.status === 'paid' ? 'Ödendi' : 'Ödenmedi', 'KDV': formatCurrency(i.vatTotal), 'Kalem Sayısı': (i.items || []).length || null, 'İş / Proje': projName(i.projectId) },
+      })),
       ...transactions.map((t) => {
-        if (t.type === 'tahsilat') return { name: t.customerName, doc: 'Tahsilat', amount: t.amount, tag: 'Tahsilat', neg: false, date: toDate(t.date) };
-        if (t.type === 'odeme') return { name: t.customerName, doc: 'Ödeme', amount: t.amount, tag: 'Ödeme', neg: true, date: toDate(t.date) };
-        if (t.type === 'transfer') return { name: t.description || 'Virman', doc: 'Virman', amount: t.amount, tag: 'Virman', neg: false, date: toDate(t.date) };
-        return { name: t.customerName || t.description, doc: 'Cari Hareket', amount: t.amount, tag: 'Cari Hareket', neg: t.cariEffect !== 'alacak', date: toDate(t.date) };
+        const common = {
+          'Açıklama': t.description || null, 'Kategori': t.category || null,
+          'Kasa / Banka': accName(t.accountId), 'Ödeme Şekli': t.method || null,
+          'İş / Proje': projName(t.projectId), 'Makbuz No': t.receiptNo || null,
+        };
+        if (t.type === 'tahsilat') return { name: t.customerName, doc: 'Tahsilat', amount: t.amount, tag: 'Tahsilat', neg: false, date: toDate(t.date), detail: { ...common, 'Cari': t.customerName } };
+        if (t.type === 'odeme') return { name: t.customerName || t.authorName || t.contractorName, doc: 'Ödeme', amount: t.amount, tag: 'Ödeme', neg: true, date: toDate(t.date), detail: { ...common, 'Cari': t.customerName, 'Müellif': t.authorName || null, 'Taşeron': t.contractorName || null } };
+        if (t.type === 'transfer') return { name: t.description || 'Virman', doc: 'Virman', amount: t.amount, tag: 'Virman', neg: false, date: toDate(t.date), detail: { 'Açıklama': t.description || null, 'Gönderen': accName(t.fromAccountId), 'Alan': accName(t.toAccountId) } };
+        return {
+          name: t.customerName || t.description, doc: 'Cari Hareket', amount: t.amount, tag: 'Cari Hareket', neg: t.cariEffect !== 'alacak', date: toDate(t.date),
+          detail: { ...common, 'Cari': t.customerName, 'Cari Etkisi': t.cariEffect === 'borc' ? 'Borç (satış)' : 'Alacak (alış)' },
+        };
       }),
-      ...incomes.map((r) => ({ name: r.customerName || r.description || r.category, doc: r.category || 'Gelir', amount: r.amount, tag: 'Gelir', neg: false, date: toDate(r.date) })),
-      ...expenses.map((r) => ({ name: r.customerName || r.description || r.category, doc: r.category || 'Gider', amount: r.amount, tag: 'Gider', neg: true, date: toDate(r.date) })),
+      ...incomes.map((r) => ({
+        name: r.customerName || r.description || r.category, doc: r.category || 'Gelir', amount: r.amount, tag: 'Gelir', neg: false, date: toDate(r.date),
+        detail: { 'Açıklama': r.description || null, 'Kategori': r.category || null, 'Cari': r.customerName || null, 'Kasa / Banka': accName(r.accountId), 'KDV Oranı': r.vatRate != null ? `%${r.vatRate}` : null, 'İş / Proje': projName(r.projectId), 'Makbuz No': r.receiptNo || null },
+      })),
+      ...expenses.map((r) => ({
+        name: r.customerName || r.description || r.category, doc: r.category || 'Gider', amount: r.amount, tag: 'Gider', neg: true, date: toDate(r.date),
+        detail: { 'Açıklama': r.description || null, 'Kategori': r.category || null, 'Cari': r.customerName || null, 'Kasa / Banka': accName(r.accountId), 'KDV Oranı': r.vatRate != null ? `%${r.vatRate}` : null, 'İş / Proje': projName(r.projectId), 'Makbuz No': r.receiptNo || null },
+      })),
     ];
     return items.filter((x) => x.date).sort((a, b) => b.date - a.date).slice(0, 6);
-  }, [salesInv, purchInv, transactions, incomes, expenses]);
+  }, [salesInv, purchInv, transactions, incomes, expenses, accounts, data.projects]);
 
   const handleExport = () => {
     const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -308,21 +380,29 @@ export default function Dashboard({ data, setPage }) {
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {recent.map((r, i) => (
-                  <div key={i} className="flex items-center gap-3 py-2.5">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>{initials(r.name)}</div>
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setDetailTx(r)}
+                    title="Detayı görüntüle"
+                    className="w-full flex items-center gap-3 py-2.5 text-left rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  >
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>{initials(r.name)}</div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium truncate ${heading}`}>{r.name || '—'}</p>
                       <p className={`text-xs truncate ${muted}`}>{r.doc} · {formatDateShort(r.date)}</p>
                     </div>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TAG_COLOR[r.tag] || 'bg-orange-100 text-orange-700'}`}>{r.tag}</span>
-                    <p className={`text-sm font-semibold w-24 text-right ${r.neg ? 'text-rose-600' : 'text-gray-800 dark:text-gray-100'}`}>{r.neg ? '-' : ''}{formatCurrency(r.amount)}</p>
-                  </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${TAG_COLOR[r.tag] || 'bg-orange-100 text-orange-700'}`}>{r.tag}</span>
+                    <p className={`text-sm font-semibold w-24 text-right flex-shrink-0 ${r.neg ? 'text-rose-600' : 'text-gray-800 dark:text-gray-100'}`}>{r.neg ? '-' : ''}{formatCurrency(r.amount)}</p>
+                  </button>
                 ))}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <TxDetailModal item={detailTx} onClose={() => setDetailTx(null)} />
     </div>
   );
 }
