@@ -57,6 +57,15 @@ const JOB_TYPES = [
 ];
 const jobTypeMeta = (key) => JOB_TYPES.find((j) => j.key === key) || JOB_TYPES[0];
 
+// Bir işin türleri. Yeni kayıtlar `jobTypes` dizisi tutar; eski kayıtlarda
+// tek değerli `jobType` alanı bulunduğundan geriye dönük olarak o da okunur.
+const jobTypeKeys = (project) => {
+  const list = Array.isArray(project?.jobTypes) ? project.jobTypes.filter(Boolean) : [];
+  if (list.length) return list;
+  return [project?.jobType || 'proje'];
+};
+const isConstructionJob = (project) => jobTypeKeys(project).includes('insaat');
+
 // Bir cariye ait işler: sahibi olduğu işler + tedarikçi olarak bağlandığı mevcut işler
 const getCustomerProjects = (customerId, data) => {
   const owned = (data.projects || []).filter((p) => p.customerId === customerId);
@@ -153,13 +162,30 @@ function CustomerForm({ existing, userId, onClose }) {
 // --- İş / Proje ekleme-düzenleme formu ---
 function ProjectForm({ customerId, existing, userId, onClose }) {
   const [form, setForm] = useState(
-    existing || { customerId, jobType: 'proje', name: '', description: '', address: '', status: 'active', openingBalance: 0, openingType: 'borc' }
+    existing
+      ? { ...existing, jobTypes: jobTypeKeys(existing) }
+      : { customerId, jobTypes: ['proje'], name: '', description: '', address: '', status: 'active', openingBalance: 0, openingType: 'borc' }
   );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  // İş türü çoklu seçim: son kalan tür kaldırılamaz (en az bir tür zorunlu).
+  const toggleJobType = (key) => {
+    setForm((f) => {
+      const cur = f.jobTypes || [];
+      const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+      return { ...f, jobTypes: next.length ? next : cur };
+    });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     if (!form.name) return;
-    const payload = { ...form, customerId, openingBalance: Number(form.openingBalance) || 0 };
+    const jobTypes = (form.jobTypes || []).length ? form.jobTypes : ['proje'];
+    // Eski sürümlerle uyum için ilk tür `jobType` alanında da saklanır.
+    const payload = {
+      ...form, customerId, jobTypes, jobType: jobTypes[0],
+      openingBalance: Number(form.openingBalance) || 0,
+    };
     delete payload.id;
     try {
       if (existing) await updateRecord(userId, 'projects', existing.id, payload);
@@ -170,19 +196,24 @@ function ProjectForm({ customerId, existing, userId, onClose }) {
   return (
     <FormModal title={existing ? 'İş / Proje Düzenle' : 'Yeni İş / Proje'} size="lg" onSubmit={submit} onClose={onClose}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="İş Türü" className="md:col-span-2">
+        <Field label="İş Türü (birden fazla seçilebilir)" className="md:col-span-2">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {JOB_TYPES.map((jt) => (
-              <button
-                key={jt.key}
-                type="button"
-                onClick={() => setForm({ ...form, jobType: jt.key })}
-                className={`flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border text-xs font-medium transition-colors ${(form.jobType || 'proje') === jt.key ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
-              >
-                <jt.icon size={18} />
-                {jt.label}
-              </button>
-            ))}
+            {JOB_TYPES.map((jt) => {
+              const on = (form.jobTypes || []).includes(jt.key);
+              return (
+                <button
+                  key={jt.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleJobType(jt.key)}
+                  className={`relative flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border text-xs font-medium transition-colors ${on ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                >
+                  {on && <CheckCircle2 size={13} className="absolute top-1 right-1" />}
+                  <jt.icon size={18} />
+                  {jt.label}
+                </button>
+              );
+            })}
           </div>
         </Field>
         <Field label="İş Adı" className="md:col-span-2"><Input name="name" value={form.name} onChange={set} required placeholder="örn. Bağdat Cd. Arsası - İnşaat" /></Field>
@@ -204,7 +235,7 @@ function JobLinkForm({ customer, data, userId, onClose, onOtherJob }) {
   const [selectedId, setSelectedId] = useState('');
   const already = new Set(getCustomerProjects(customer.id, data).map((p) => p.id));
   const options = (data.projects || [])
-    .filter((p) => p.jobType === 'insaat' && !already.has(p.id))
+    .filter((p) => isConstructionJob(p) && !already.has(p.id))
     .map((p) => ({ ...p, _owner: (data.customers || []).find((c) => c.id === p.customerId)?.name || '' }));
 
   const submit = async (e) => {
@@ -812,8 +843,8 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
   const [reportOpen, setReportOpen] = useState(false);
   const customerProjects = getCustomerProjects(customer.id, data);
   const txById = (id) => (data.transactions || []).find((t) => t.id === id);
-  const JobIcon = jobTypeMeta(project.jobType).icon;
-  const isConstruction = project.jobType === 'insaat';
+  const projectTypes = jobTypeKeys(project);
+  const isConstruction = isConstructionJob(project);
 
   const handleLedgerEdit = (ref) => {
     if (ref.kind === 'transaction') setEditTx(txById(ref.id));
@@ -876,7 +907,18 @@ function ProjectLedger({ customer, project, data, userId, onBack }) {
       <button onClick={onBack} className="flex items-center text-sm text-gray-500 hover:text-gray-800 mb-4"><ArrowLeft size={16} className="mr-1" />{customer.name} işlerine dön</button>
       <div className="flex flex-col lg:flex-row justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><JobIcon size={22} className="text-orange-600" />{project.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            {projectTypes.map((k) => {
+              const Icon = jobTypeMeta(k).icon;
+              return <Icon key={k} size={22} className="text-orange-600" title={jobTypeMeta(k).label} />;
+            })}
+            {project.name}
+          </h1>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {projectTypes.map((k) => (
+              <Badge key={k} color="sky">{jobTypeMeta(k).label}</Badge>
+            ))}
+          </div>
           <p className="text-sm text-gray-500 mt-1">{customer.name}{project.address ? ` · ${project.address}` : ''}</p>
           {project.description && <p className="text-sm text-gray-500 mt-1">{project.description}</p>}
         </div>
@@ -1147,13 +1189,18 @@ function CustomerDetail({ customer, data, userId, onBack }) {
         ) : (
           <Table headers={[{ label: 'İş / Proje' }, { label: 'Adres' }, { label: 'Durum' }, { label: 'Bakiye', align: 'right' }, { label: '' }]}>
             {customerProjects.map((p) => {
-              const PIcon = jobTypeMeta(p.jobType).icon;
+              const pTypes = jobTypeKeys(p);
               const linkDoc = p._linked ? (data.projectLinks || []).find((l) => l.projectId === p.id && l.customerId === customer.id) : null;
               return (
               <tr key={p.id} className="hover:bg-gray-50">
                 <Td className="font-medium text-gray-900 cursor-pointer" onClick={() => setSelectedProject(p)}>
                   <span className="flex items-center gap-2">
-                    <PIcon size={15} className="text-orange-600" />
+                    <span className="flex items-center gap-1 flex-shrink-0">
+                      {pTypes.map((k) => {
+                        const Icon = jobTypeMeta(k).icon;
+                        return <Icon key={k} size={15} className="text-orange-600" title={jobTypeMeta(k).label} />;
+                      })}
+                    </span>
                     {p.name}
                     {p._linked && <span title="Başka bir cariye ait, tedarikçi olarak bağlısınız" className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-600"><Link2 size={10} />Bağlı</span>}
                   </span>
