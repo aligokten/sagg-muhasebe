@@ -241,7 +241,7 @@ export default function Dashboard({ data, setPage }) {
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setPage('reports')} className={`flex items-center gap-1.5 px-4 py-2 rounded-full ${card} text-sm font-medium text-gray-600 dark:text-gray-200 hover:opacity-90`}><Filter size={15} />Raporlar</button>
           <button onClick={handleExport} className={`flex items-center gap-1.5 px-4 py-2 rounded-full ${card} text-sm font-medium text-gray-600 dark:text-gray-200 hover:opacity-90`}><Download size={15} />Excel</button>
-          <button onClick={() => setPage('invoices')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-orange-600 hover:bg-orange-700 shadow-sm"><FileText size={15} />Fatura Ekle</button>
+          <button onClick={() => setPage('cashflow')} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium bg-orange-600 hover:bg-orange-700 shadow-sm"><TrendingUp size={15} />Gelir / Gider Ekle</button>
         </div>
       </div>
 
