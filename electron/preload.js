@@ -3,5 +3,5 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('saggDesktop', {
   // Canlı altın/döviz fiyatları (masaüstünde tarayıcı CORS kısıtı olmadan alınır)
-  fetchMarketPrices: () => ipcRenderer.invoke('market:prices'),
+  fetchMarketPrices: (request) => ipcRenderer.invoke('market:prices', request),
 });

@@ -124,20 +124,26 @@ function buildMenu(win) {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-// --- Canlı piyasa verisi (Harem Altın) ---
+// --- Canlı piyasa verisi (altın & döviz) ---
 // Tarayıcıda CORS engeline takılan istek, masaüstünde ana süreçten yapılır.
-const HAREM_URL = 'https://canlipiyasalar.haremaltin.com/tmp/altin.json';
+// Renderer'dan gelen adres yalnızca izin verilen sağlayıcılara yönlendirilebilir.
+const ALLOWED_PRICE_HOSTS = ['datshop.com', 'haremaltin.com'];
 
-ipcMain.handle('market:prices', async () => {
+const isAllowedPriceUrl = (raw) => {
   try {
-    const res = await net.fetch(HAREM_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: 'dil_kodu=tr',
-    });
+    const u = new URL(raw);
+    if (u.protocol !== 'https:') return false;
+    return ALLOWED_PRICE_HOSTS.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+};
+
+ipcMain.handle('market:prices', async (_event, req) => {
+  const { url, method = 'GET', headers = {}, body } = req || {};
+  if (!isAllowedPriceUrl(url)) return { ok: false, error: 'İzin verilmeyen fiyat servisi adresi' };
+  try {
+    const res = await net.fetch(url, { method, headers, body });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     return { ok: true, data: await res.json() };
   } catch (err) {

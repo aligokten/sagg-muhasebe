@@ -2,15 +2,16 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   RefreshCw, PlusCircle, Edit, Trash2, TrendingUp, TrendingDown, Coins,
-  Wallet, ArrowUpRight, ArrowDownRight, AlertTriangle, Radio,
+  Wallet, ArrowUpRight, ArrowDownRight, AlertTriangle, Radio, Database,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { addRecord, updateRecord, deleteRecord, Timestamp } from '../firebase';
 import { formatCurrency, formatNumber, formatDateShort, todayInput, toInputDate } from '../utils';
 import { FormModal, ConfirmDialog, Field, Input, Select, Textarea } from '../components/ui';
 import {
-  INSTRUMENTS, INSTRUMENT_MAP, FEATURED_CODES, fetchLivePrices, previousClose, toTry, unitLabel,
-} from '../harem';
+  INSTRUMENTS, INSTRUMENT_MAP, FEATURED_CODES, PROVIDERS,
+  fetchLivePrices, getSource, setSource, previousClose, toTry, unitLabel,
+} from '../marketData';
 
 const REFRESH_MS = 60 * 1000;
 // Fiyatlar her zaman iki basamakla gösterilir (₺4.512,30)
@@ -19,8 +20,8 @@ const price2 = (v) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2,
 const PIE_COLORS = ['#f59e0b', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb7185', '#22d3ee', '#facc15'];
 
 // --- Canlı fiyat akışı ---
-function useLivePrices() {
-  const [state, setState] = useState({ prices: {}, fetchedAt: null, source: null, loading: true, error: null });
+function useLivePrices(source) {
+  const [state, setState] = useState({ prices: {}, fetchedAt: null, channel: null, loading: true, error: null });
   const abortRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -29,13 +30,13 @@ function useLivePrices() {
     abortRef.current = ctrl;
     setState((s) => ({ ...s, loading: true }));
     try {
-      const { prices, source, fetchedAt } = await fetchLivePrices({ signal: ctrl.signal });
-      setState({ prices, fetchedAt, source, loading: false, error: null });
+      const { prices, source: channel, fetchedAt } = await fetchLivePrices({ signal: ctrl.signal, source });
+      setState({ prices, fetchedAt, channel, loading: false, error: null });
     } catch (err) {
       if (err?.name === 'AbortError') return;
       setState((s) => ({ ...s, loading: false, error: err?.message || 'Canlı fiyatlar alınamadı' }));
     }
-  }, []);
+  }, [source]);
 
   useEffect(() => {
     load();
@@ -257,10 +258,48 @@ export function InvestmentForm({ existing, userId, prices, onClose }) {
   );
 }
 
+// --- Veri kaynağı ayarları (sağlayıcı, uç nokta, opsiyonel anahtar) ---
+export function SourceForm({ source, onSave, onClose }) {
+  const [form, setForm] = useState({ ...source });
+  const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const selectProvider = (e) => {
+    const provider = e.target.value;
+    setForm({ ...form, provider, url: PROVIDERS[provider].defaultUrl });
+  };
+  const submit = (e) => {
+    e.preventDefault();
+    onSave({ ...form, url: (form.url || '').trim() || PROVIDERS[form.provider].defaultUrl, apiKey: (form.apiKey || '').trim() });
+    onClose();
+  };
+  return (
+    <FormModal title="Veri Kaynağı" size="lg" onSubmit={submit} onClose={onClose} submitLabel="Kaydet ve Yenile">
+      <div className="grid grid-cols-1 gap-4">
+        <Field label="Sağlayıcı">
+          <Select name="provider" value={form.provider} onChange={selectProvider}>
+            {Object.values(PROVIDERS).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </Select>
+        </Field>
+        <Field label="Fiyat servisi adresi">
+          <Input name="url" value={form.url} onChange={set} placeholder={PROVIDERS[form.provider].defaultUrl} />
+        </Field>
+        <Field label="API anahtarı (servis istiyorsa)">
+          <Input name="apiKey" value={form.apiKey || ''} onChange={set} placeholder="Gerekmiyorsa boş bırakın" />
+        </Field>
+      </div>
+      <p className="text-xs text-gray-400 mt-3">
+        Adres bu tarayıcıda saklanır. Servisin yanıtı otomatik çözümlenir: kod → fiyat sözlüğü ya da
+        liste biçimindeki JSON yanıtlar, alış/satış (alis, satis, buy, sell…) alanlarıyla eşleştirilir.
+      </p>
+    </FormModal>
+  );
+}
+
 // --- Ana sayfa ---
 export default function Investments({ data, userId }) {
   const { investments = [] } = data;
-  const { prices, fetchedAt, loading, error, reload } = useLivePrices();
+  const [source, setSourceState] = useState(getSource);
+  const { prices, fetchedAt, loading, error, reload } = useLivePrices(source);
+  const [sourceOpen, setSourceOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
@@ -275,6 +314,10 @@ export default function Investments({ data, userId }) {
   const goldGram = prices?.ALTIN?.alis ? totals.value / prices.ALTIN.alis : 0;
   const pieData = rows.filter((r) => r.value > 0).map((r) => ({ name: r.label, value: r.value }));
 
+  const providerLabel = (PROVIDERS[source.provider] || PROVIDERS.datshop).label;
+
+  const saveSource = (next) => { setSource(next); setSourceState(next); };
+
   const openNew = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (inv) => { setEditing(inv); setFormOpen(true); };
 
@@ -287,12 +330,19 @@ export default function Investments({ data, userId }) {
           <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 flex-wrap">
             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg ${error ? 'bg-rose-500/15 text-rose-300' : 'bg-emerald-500/15 text-emerald-300'}`}>
               <Radio size={12} className={loading ? 'animate-pulse' : ''} />
-              {error ? 'Canlı veri yok' : 'Harem Altın · canlı'}
+              {error ? `${providerLabel} · veri yok` : `${providerLabel} · canlı`}
             </span>
             {fetchedAt && <span>Son güncelleme {fetchedAt.toLocaleTimeString('tr-TR')}</span>}
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSourceOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-gray-200"
+            title="Veri kaynağı ayarları"
+          >
+            <Database size={15} /> Veri Kaynağı
+          </button>
           <button
             onClick={reload}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-gray-200"
@@ -314,7 +364,8 @@ export default function Investments({ data, userId }) {
           <div>
             <p className="font-medium">Canlı fiyatlar alınamadı ({error}).</p>
             <p className="text-amber-200/70 text-xs mt-1">
-              Kayıtlarınız ve maliyetleriniz görüntülenmeye devam eder; bağlantı sağlandığında değerler otomatik güncellenir.
+              Kayıtlarınız ve maliyetleriniz görüntülenmeye devam eder; bağlantı sağlandığında değerler otomatik
+              güncellenir. Servis adresi hatalıysa “Veri Kaynağı” ekranından düzeltebilirsiniz.
             </p>
           </div>
         </div>
@@ -518,6 +569,9 @@ export default function Investments({ data, userId }) {
         )}
       </Panel>
 
+      {sourceOpen && (
+        <SourceForm source={source} onSave={saveSource} onClose={() => setSourceOpen(false)} />
+      )}
       {formOpen && (
         <InvestmentForm
           existing={editing}
