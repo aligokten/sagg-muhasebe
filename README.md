@@ -24,6 +24,11 @@ olarak senkronize edilir.
 - **Çek & Senet** — Alınan/verilen çek-senet portföyü, vade takibi, tahsil/ödeme
 - **Gelir & Gider** — Fatura dışı gelir ve giderler, KDV ayrımı
 
+### Yatırım
+- **Yatırım Takibi** — Altın (gram/adet) ve döviz portföyü; fiyatlar **haremaltin.com**
+  üzerinden canlı alınır (60 sn'de bir yenilenir). Alım kaydında o günün fiyatı otomatik
+  yazılır, maliyet–güncel değer–kar/zarar ve günlük değişim canlı hesaplanır.
+
 ### Raporlar & Diğer
 - **Raporlar** — KDV raporu, aylık gelir/gider grafiği, gider dağılımı, cari yaşlandırma
 - **Gösterge Paneli** — Genel finansal özet, trend grafiği, uyarılar
@@ -47,13 +52,14 @@ src/
   firebase.js              Firebase yapılandırması ve CRUD veri katmanı
   utils.js                 Biçimlendirme & hesaplama yardımcıları
   finance.js               Bakiye/stok hesaplama motoru
+  harem.js                 Harem Altın canlı fiyat servisi (altın/döviz kotasyonları)
   components/
     ui.js                  Paylaşılan arayüz bileşenleri (Modal, Table, Card...)
     DocumentForm.js        Fatura/teklif/sipariş ortak belge formu
     PrintView.js           Yazdırılabilir belge görünümü (yazdır + PDF)
   modules/                 Dashboard, Customers, Products, Invoices, Quotes,
                            Orders, Waybills, Accounts, Checks, CashFlow,
-                           Personnel, Reports, Agenda, Settings
+                           Personnel, Reports, Agenda, Investments, Settings
   ArsaPaylastir.js         Arsa paylaştırma modülü
 ```
 

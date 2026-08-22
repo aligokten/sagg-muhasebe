@@ -1,5 +1,5 @@
 // --- SAGG Muhasebe masaüstü uygulaması (Electron ana süreç) ---
-const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain, net } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -124,6 +124,27 @@ function buildMenu(win) {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+// --- Canlı piyasa verisi (Harem Altın) ---
+// Tarayıcıda CORS engeline takılan istek, masaüstünde ana süreçten yapılır.
+const HAREM_URL = 'https://canlipiyasalar.haremaltin.com/tmp/altin.json';
+
+ipcMain.handle('market:prices', async () => {
+  try {
+    const res = await net.fetch(HAREM_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: 'dil_kodu=tr',
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true, data: await res.json() };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'Bilinmeyen hata' };
+  }
+});
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1360,
@@ -138,6 +159,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: false,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 

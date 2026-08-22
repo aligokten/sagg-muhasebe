@@ -2,7 +2,7 @@
 export const COLLECTIONS = [
   'customers', 'projects', 'authors', 'subcontracts', 'products', 'invoices', 'quotes', 'orders', 'waybills',
   'transactions', 'accounts', 'expenses', 'incomes', 'checks',
-  'personnel', 'stockMovements', 'reminders',
+  'personnel', 'stockMovements', 'reminders', 'investments',
   'subcontractors', 'contractorAssignments', 'projectLinks', 'zReports',
 ];
 

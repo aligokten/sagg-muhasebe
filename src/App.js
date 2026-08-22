@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
   TrendingUp, X, DraftingCompass, LogOut, Cloud, ListChecks, Calculator,
-  HardHat, FileBarChart, ShieldCheck, Lock,
+  HardHat, FileBarChart, ShieldCheck, Lock, Coins,
 } from 'lucide-react';
 
 import {
@@ -37,6 +37,7 @@ import Agenda from './modules/Agenda';
 import Settings from './modules/Settings';
 import AllTransactions from './modules/AllTransactions';
 import ZReport from './modules/ZReport';
+import Investments from './modules/Investments';
 import { CalculatorModal } from './components/DashboardGadgets';
 import ArsaPaylastir from './ArsaPaylastir';
 import { buildZReport, getMissingReportDates } from './zreport';
@@ -78,6 +79,7 @@ const NAV_GROUPS = [
       { id: 'cashflow', label: 'Gelir & Gider', icon: TrendingUp },
       { id: 'activity', label: 'Tüm İşlemler', icon: ListChecks },
       { id: 'zreport', label: 'Z Raporu', icon: FileBarChart },
+      { id: 'investments', label: 'Yatırım Takibi', icon: Coins },
     ],
   },
   {
@@ -350,6 +352,7 @@ export default function App() {
       case 'cashflow': return <CashFlow data={fullData} userId={userId} />;
       case 'activity': return <AllTransactions data={fullData} userId={userId} />;
       case 'zreport': return <ZReport data={fullData} />;
+      case 'investments': return <Investments data={fullData} userId={userId} />;
       case 'reports': return <Reports data={fullData} />;
       case 'agenda': return <Agenda data={fullData} userId={userId} />;
       case 'arsapay': return <ArsaPaylastir />;
