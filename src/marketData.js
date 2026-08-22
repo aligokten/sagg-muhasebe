@@ -15,9 +15,21 @@
 // "Veri Kaynağı" ekranından girilebilir (localStorage'da saklanır); adres
 // JSON yerine HTML sayfa döndürürse fiyat tablosu sayfadan okunur.
 export const DATSHOP_URL = 'https://www.datshop.com.tr';
+// Gösterge panelindeki piyasa ticker'ının da kullandığı kaynak
+// (bkz. components/DashboardGadgets.js): CORS açık, ücretsiz, anahtar istemez.
+export const TRUNCGIL_URL = 'https://finans.truncgil.com/v4/today.json';
 export const HAREM_URL = 'https://canlipiyasalar.haremaltin.com/tmp/altin.json';
 
 export const PROVIDERS = {
+  truncgil: {
+    id: 'truncgil',
+    label: 'Truncgil',
+    defaultUrl: TRUNCGIL_URL,
+    request: (url) => ({
+      url,
+      init: { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json' } },
+    }),
+  },
   datshop: {
     id: 'datshop',
     label: 'datshop.com.tr',
@@ -60,7 +72,7 @@ export const PROVIDERS = {
 
 // --- Kullanıcı tarafından seçilen kaynak (tarayıcıda saklanır) ---
 const SOURCE_KEY = 'sagg-market-source';
-export const DEFAULT_SOURCE = { provider: 'datshop', url: DATSHOP_URL, apiKey: '' };
+export const DEFAULT_SOURCE = { provider: 'truncgil', url: TRUNCGIL_URL, apiKey: '' };
 
 export const getSource = () => {
   try {
@@ -81,23 +93,23 @@ export const setSource = (src) => {
 // currency: fiyatın para birimi (USD olanlar USDTRY ile TL'ye çevrilir)
 // aliases: sağlayıcıların bu enstrüman için kullandığı diğer kod/ad karşılıkları
 export const INSTRUMENTS = [
-  { code: 'ALTIN', label: 'Has Altın', unit: 'gram', group: 'Altın', aliases: ['GRAMALTIN', 'HASALTIN', 'GRAMALTINTRY', 'XAUTRY', 'GA'] },
+  { code: 'ALTIN', label: 'Has Altın', unit: 'gram', group: 'Altın', aliases: ['GRA', 'GRAMALTIN', 'HASALTIN', 'GRAMALTINTRY', 'XAUTRY', 'GA'] },
   { code: 'KULCEALTIN', label: 'Külçe Altın', unit: 'gram', group: 'Altın', aliases: ['KULCE', 'KULCEALTINI'] },
-  { code: 'AYAR22', label: '22 Ayar Bilezik', unit: 'gram', group: 'Altın', aliases: ['22AYAR', 'AYAR22BILEZIK', 'BILEZIK22', 'YIRMIIKIAYAR'] },
-  { code: 'AYAR14', label: '14 Ayar Altın', unit: 'gram', group: 'Altın', aliases: ['14AYAR', 'ONDORTAYAR'] },
+  { code: 'AYAR22', label: '22 Ayar Bilezik', unit: 'gram', group: 'Altın', aliases: ['22AYAR', 'AYAR22BILEZIK', 'BILEZIK22', 'YIRMIIKIAYAR', '22AYARBILEZIK'] },
+  { code: 'AYAR14', label: '14 Ayar Altın', unit: 'gram', group: 'Altın', aliases: ['14AYAR', 'ONDORTAYAR', '14AYARALTIN'] },
   { code: 'CEYREK_YENI', label: 'Çeyrek Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['CEYREKYENI', 'YENICEYREK', 'CEYREKALTIN', 'CEYREK'] },
   { code: 'CEYREK_ESKI', label: 'Çeyrek Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['CEYREKESKI', 'ESKICEYREK'] },
   { code: 'YARIM_YENI', label: 'Yarım Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['YARIMYENI', 'YENIYARIM', 'YARIMALTIN', 'YARIM'] },
   { code: 'YARIM_ESKI', label: 'Yarım Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['YARIMESKI', 'ESKIYARIM'] },
-  { code: 'TEK_YENI', label: 'Tam Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['TEKYENI', 'TAMYENI', 'TAMALTIN', 'TAM', 'TEK', 'BIRLIKYENI'] },
+  { code: 'TEK_YENI', label: 'Tam Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['TEKYENI', 'TAMYENI', 'TAMALTIN', 'CUMHURIYETALTINI', 'CUMHURIYET', 'TAM', 'TEK', 'BIRLIKYENI'] },
   { code: 'TEK_ESKI', label: 'Tam Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['TEKESKI', 'TAMESKI', 'BIRLIKESKI'] },
-  { code: 'ATA_YENI', label: 'Ata Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['ATAYENI', 'YENIATA', 'ATAALTIN', 'ATA'] },
+  { code: 'ATA_YENI', label: 'Ata Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['ATAYENI', 'YENIATA', 'ATAALTIN', 'ATALIRA', 'ATA'] },
   { code: 'ATA_ESKI', label: 'Ata Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['ATAESKI', 'ESKIATA'] },
   { code: 'ATA5_YENI', label: "5'li Ata (Yeni)", unit: 'adet', group: 'Altın', aliases: ['ATA5YENI', 'BESLIATAYENI'] },
   { code: 'ATA5_ESKI', label: "5'li Ata (Eski)", unit: 'adet', group: 'Altın', aliases: ['ATA5ESKI', 'BESLIATAESKI'] },
   { code: 'GREMESE_YENI', label: 'Gremse Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['GREMSEYENI', 'GREMESEYENI', 'GREMSE'] },
   { code: 'GREMESE_ESKI', label: 'Gremse Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['GREMSEESKI', 'GREMESEESKI'] },
-  { code: 'GUMUSTRY', label: 'Gümüş (Gram)', unit: 'gram', group: 'Gümüş', aliases: ['GUMUS', 'GRAMGUMUS', 'XAGTRY'] },
+  { code: 'GUMUSTRY', label: 'Gümüş (Gram)', unit: 'gram', group: 'Gümüş', aliases: ['GUMUS', 'GRAMGUMUS', 'GUMUSALTIN', 'XAGTRY'] },
   { code: 'USDTRY', label: 'Amerikan Doları', unit: 'birim', group: 'Döviz', aliases: ['USD', 'DOLAR', 'USDTL', 'AMERIKANDOLARI'] },
   { code: 'EURTRY', label: 'Euro', unit: 'birim', group: 'Döviz', aliases: ['EUR', 'EURO', 'EURTL'] },
   { code: 'GBPTRY', label: 'İngiliz Sterlini', unit: 'birim', group: 'Döviz', aliases: ['GBP', 'STERLIN', 'GBPTL', 'INGILIZSTERLINI'] },
@@ -377,7 +389,7 @@ const CHANNELS = [
 // Canlı fiyatları getirir. Başarısızlıkta son hata fırlatılır.
 export async function fetchLivePrices({ signal, source } = {}) {
   const src = source || getSource();
-  const provider = PROVIDERS[src.provider] || PROVIDERS.datshop;
+  const provider = PROVIDERS[src.provider] || PROVIDERS.truncgil;
   const request = provider.request(src.url || provider.defaultUrl, src.apiKey);
   const ordered = [...CHANNELS].sort((a, b) => (b.id === preferredChannel ? 1 : 0) - (a.id === preferredChannel ? 1 : 0));
 
