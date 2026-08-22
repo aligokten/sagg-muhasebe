@@ -25,8 +25,9 @@ olarak senkronize edilir.
 - **Gelir & Gider** — Fatura dışı gelir ve giderler, KDV ayrımı
 
 ### Yatırım
-- **Yatırım Takibi** — Altın (gram/adet) ve döviz portföyü; fiyatlar **datshop.com**
-  üzerinden canlı alınır (60 sn'de bir yenilenir). Alım kaydında o günün fiyatı otomatik
+- **Yatırım Takibi** — Altın (gram/adet) ve döviz portföyü; fiyatlar **datshop.com.tr**
+  üzerinden canlı alınır (60 sn'de bir yenilenir; kaynak JSON döndürmezse sayfadaki
+  fiyat tablosu okunur). Alım kaydında o günün fiyatı otomatik
   yazılır, maliyet–güncel değer–kar/zarar ve günlük değişim canlı hesaplanır.
   Servis adresi ve (gerekiyorsa) API anahtarı sayfadaki **Veri Kaynağı** ekranından
   değiştirilebilir; yedek sağlayıcı olarak Harem Altın da seçilebilir.

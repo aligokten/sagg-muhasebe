@@ -127,7 +127,7 @@ function buildMenu(win) {
 // --- Canlı piyasa verisi (altın & döviz) ---
 // Tarayıcıda CORS engeline takılan istek, masaüstünde ana süreçten yapılır.
 // Renderer'dan gelen adres yalnızca izin verilen sağlayıcılara yönlendirilebilir.
-const ALLOWED_PRICE_HOSTS = ['datshop.com', 'haremaltin.com'];
+const ALLOWED_PRICE_HOSTS = ['datshop.com.tr', 'datshop.com', 'haremaltin.com'];
 
 const isAllowedPriceUrl = (raw) => {
   try {
@@ -145,7 +145,8 @@ ipcMain.handle('market:prices', async (_event, req) => {
   try {
     const res = await net.fetch(url, { method, headers, body });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return { ok: true, data: await res.json() };
+    // Gövde ham metin olarak aktarılır; JSON ya da HTML çözümlemesi renderer'da yapılır.
+    return { ok: true, data: await res.text() };
   } catch (err) {
     return { ok: false, error: err?.message || 'Bilinmeyen hata' };
   }

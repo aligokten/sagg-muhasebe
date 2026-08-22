@@ -10,7 +10,7 @@ import { formatCurrency, formatNumber, formatDateShort, todayInput, toInputDate 
 import { FormModal, ConfirmDialog, Field, Input, Select, Textarea } from '../components/ui';
 import {
   INSTRUMENTS, INSTRUMENT_MAP, FEATURED_CODES, PROVIDERS,
-  fetchLivePrices, getSource, setSource, previousClose, toTry, unitLabel,
+  fetchLivePrices, getSource, setSource, previousClose, changePct, toTry, unitLabel,
 } from '../marketData';
 
 const REFRESH_MS = 60 * 1000;
@@ -77,11 +77,12 @@ export function buildPortfolio(investments, prices) {
     const prevPrice = row ? toTry(previousClose(row), g.code, prices) : 0;
     const value = g.quantity * unitPrice;
     const profit = row ? value - g.cost : 0;
-    const dailyChange = row ? g.quantity * (unitPrice - prevPrice) : 0;
+    const hasDaily = changePct(row) !== null;
+    const dailyChange = hasDaily ? g.quantity * (unitPrice - prevPrice) : 0;
     return {
       ...g,
       avgCost: g.quantity ? g.cost / g.quantity : 0,
-      unitPrice, prevPrice, value, profit, dailyChange,
+      unitPrice, prevPrice, value, profit, dailyChange, hasDaily,
       profitPct: g.cost ? (profit / g.cost) * 100 : 0,
       priced: !!row,
     };
@@ -94,8 +95,10 @@ export function buildPortfolio(investments, prices) {
     dailyChange: acc.dailyChange + r.dailyChange,
   }), { cost: 0, value: 0, profit: 0, dailyChange: 0 });
   totals.profitPct = totals.cost ? (totals.profit / totals.cost) * 100 : 0;
+  // Kaynak önceki kapanış vermiyorsa günlük değişim hesaplanamaz.
+  totals.dailyKnown = rows.some((r) => r.hasDaily);
   const prevValue = totals.value - totals.dailyChange;
-  totals.dailyPct = prevValue ? (totals.dailyChange / prevValue) * 100 : 0;
+  totals.dailyPct = totals.dailyKnown && prevValue ? (totals.dailyChange / prevValue) * 100 : null;
 
   return { rows, totals };
 }
@@ -106,6 +109,7 @@ const Panel = ({ className = '', children }) => (
 );
 
 const DeltaPill = ({ value, suffix = '%' }) => {
+  if (value === null || value === undefined) return null;
   const up = value >= 0;
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold ${up ? 'bg-emerald-400/90 text-emerald-950' : 'bg-rose-400/90 text-rose-950'}`}>
@@ -132,8 +136,7 @@ const StatTile = ({ title, value, delta, hint, icon: Icon }) => (
 const PriceChip = ({ code, row, prices }) => {
   const meta = INSTRUMENT_MAP[code] || { label: code, unit: 'birim' };
   if (!row) return null;
-  const prev = previousClose(row);
-  const pct = prev ? ((row.alis - prev) / prev) * 100 : 0;
+  const pct = changePct(row);
   const cur = meta.currency === 'USD' ? '$' : '₺';
   return (
     <Panel className="p-4 min-w-[190px] flex-shrink-0">
@@ -396,12 +399,16 @@ export default function Investments({ data, userId }) {
         <div className="rounded-2xl p-5 bg-gradient-to-br from-amber-300 via-orange-400 to-rose-400 text-gray-900 flex flex-col justify-between min-h-[132px]">
           <p className="text-xs uppercase tracking-wider text-gray-800/70">Günlük Değişim</p>
           <p className="text-2xl sm:text-[28px] font-semibold mt-3 leading-tight">
-            {totals.dailyChange >= 0 ? '+' : ''}{formatCurrency(totals.dailyChange)}
+            {totals.dailyKnown
+              ? `${totals.dailyChange >= 0 ? '+' : ''}${formatCurrency(totals.dailyChange)}`
+              : '—'}
           </p>
           <p className="text-xs text-gray-900/70 mt-3">
-            {goldGram > 0
-              ? `Portföyünüz ${formatNumber(goldGram, 2)} gram has altına denk`
-              : 'Önceki kapanışa göre'}
+            {!totals.dailyKnown
+              ? 'Kaynak önceki kapanış vermiyor'
+              : goldGram > 0
+                ? `Portföyünüz ${formatNumber(goldGram, 2)} gram has altına denk`
+                : 'Önceki kapanışa göre'}
           </p>
         </div>
       </div>

@@ -11,15 +11,16 @@
 //   2) Doğrudan tarayıcı isteği
 //   3) Genel CORS aktarıcıları (yedek)
 
-// datshop.com fiyat uç noktası. Servisin tam adresi uygulama içindeki
-// "Veri Kaynağı" ekranından da değiştirilebilir (localStorage'da saklanır).
-export const DATSHOP_URL = 'https://datshop.com/api/prices';
+// datshop fiyat kaynağı. JSON uç noktası biliniyorsa uygulama içindeki
+// "Veri Kaynağı" ekranından girilebilir (localStorage'da saklanır); adres
+// JSON yerine HTML sayfa döndürürse fiyat tablosu sayfadan okunur.
+export const DATSHOP_URL = 'https://www.datshop.com.tr';
 export const HAREM_URL = 'https://canlipiyasalar.haremaltin.com/tmp/altin.json';
 
 export const PROVIDERS = {
   datshop: {
     id: 'datshop',
-    label: 'datshop.com',
+    label: 'datshop.com.tr',
     defaultUrl: DATSHOP_URL,
     // Anahtar isteğe bağlıdır; girilmişse hem başlık hem sorgu parametresi
     // olarak gönderilir (servislerin ikisinden birini beklemesi yaygındır).
@@ -32,7 +33,7 @@ export const PROVIDERS = {
         init: {
           method: 'GET',
           headers: {
-            Accept: 'application/json',
+            Accept: 'application/json, text/html;q=0.9',
             ...(apiKey ? { Authorization: `Bearer ${apiKey}`, 'X-Api-Key': apiKey } : {}),
           },
         },
@@ -225,6 +226,87 @@ export const normalizePrices = (payload) => {
   return out;
 };
 
+// --- HTML fiyat tablosu çözümleyici ---
+// Kaynak JSON yerine sayfa döndürdüğünde (ör. kuyumcu fiyat panosu), sayfadaki
+// "ürün adı + alış + satış" düzeni metin üzerinden okunur.
+
+// Türkçe karakterleri ve büyük/küçük harfi sadeleştirir; boşluk düzeni korunur.
+const foldText = (raw) =>
+  String(raw || '')
+    .replace(/[çğıİöşüÇĞÖŞÜ]/g, (c) => TR_MAP[c] || c)
+    .toUpperCase();
+
+// Etiketten sonra gelen ilk iki sayı alış/satış kabul edilir.
+const NUMBER_RE = /\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?/g;
+const SEARCH_WINDOW = 120; // etiketten sonra taranan karakter sayısı
+
+// Sayfada aranacak metin karşılıkları (özelden genele doğru sıralı)
+const HTML_PATTERNS = [
+  ['CEYREK_YENI', ['YENI CEYREK', 'CEYREK YENI', 'CEYREK ALTIN YENI']],
+  ['CEYREK_ESKI', ['ESKI CEYREK', 'CEYREK ESKI', 'CEYREK ALTIN ESKI']],
+  ['YARIM_YENI', ['YENI YARIM', 'YARIM YENI', 'YARIM ALTIN YENI']],
+  ['YARIM_ESKI', ['ESKI YARIM', 'YARIM ESKI', 'YARIM ALTIN ESKI']],
+  ['TEK_YENI', ['YENI TAM', 'TAM YENI', 'TAM ALTIN YENI', 'YENI TEK', 'TEK YENI']],
+  ['TEK_ESKI', ['ESKI TAM', 'TAM ESKI', 'TAM ALTIN ESKI', 'ESKI TEK', 'TEK ESKI']],
+  ['ATA5_YENI', ['5 LI ATA YENI', "5'LI ATA YENI", 'BESLI ATA YENI']],
+  ['ATA5_ESKI', ['5 LI ATA ESKI', "5'LI ATA ESKI", 'BESLI ATA ESKI']],
+  ['ATA_YENI', ['YENI ATA', 'ATA YENI', 'ATA ALTIN YENI']],
+  ['ATA_ESKI', ['ESKI ATA', 'ATA ESKI', 'ATA ALTIN ESKI']],
+  ['GREMESE_YENI', ['GREMSE YENI', 'GREMESE YENI']],
+  ['GREMESE_ESKI', ['GREMSE ESKI', 'GREMESE ESKI']],
+  ['AYAR22', ['22 AYAR BILEZIK', '22 AYAR', 'BILEZIK']],
+  ['AYAR14', ['14 AYAR']],
+  ['KULCEALTIN', ['KULCE ALTIN', 'KULCE']],
+  ['ALTIN', ['GRAM ALTIN', 'HAS ALTIN', 'GRAM HAS ALTIN']],
+  ['CEYREK_YENI', ['CEYREK ALTIN', 'CEYREK']],
+  ['YARIM_YENI', ['YARIM ALTIN', 'YARIM']],
+  ['TEK_YENI', ['TAM ALTIN', 'CUMHURIYET ALTINI']],
+  ['ATA_YENI', ['ATA ALTIN', 'ATA LIRA']],
+  ['ONS', ['ONS ALTIN', 'XAUUSD']],
+  ['GUMUSTRY', ['GRAM GUMUS', 'GUMUS']],
+  ['USDTRY', ['AMERIKAN DOLARI', 'DOLAR', 'USD']],
+  ['EURTRY', ['EURO', 'EUR']],
+  ['GBPTRY', ['INGILIZ STERLINI', 'STERLIN', 'GBP']],
+  ['CHFTRY', ['ISVICRE FRANGI', 'CHF']],
+  ['SARTRY', ['SUUDI RIYALI', 'SAR']],
+];
+
+// "22 AYAR" -> /22[\s\-–—|]*AYAR/ (etiketler sayfada farklı ayraçlarla yazılabilir)
+const patternToRegex = (pattern) =>
+  new RegExp(pattern.split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\-–—|/]*'));
+
+export const parseHtmlPrices = (html) => {
+  // Etiketlerle sayıların birbirine yapışmaması için etiketler ayraca çevrilir.
+  const text = foldText(String(html || '').replace(/<[^>]*>/g, ' | ').replace(/&nbsp;?/gi, ' ').replace(/&amp;/gi, '&'));
+  const out = {};
+  HTML_PATTERNS.forEach(([code, patterns]) => {
+    if (out[code]) return;
+    for (const pattern of patterns) {
+      const hit = patternToRegex(pattern).exec(text);
+      if (!hit) continue;
+      const window = text.slice(hit.index + hit[0].length, hit.index + hit[0].length + SEARCH_WINDOW);
+      const numbers = (window.match(NUMBER_RE) || []).map(parseAmount).filter((n) => n > 0);
+      if (numbers.length < 2) continue;
+      const [alis, satis] = numbers;
+      out[code] = { code, alis, satis, kapanis: 0, oran: 0, dusuk: 0, yuksek: 0, tarih: '' };
+      break;
+    }
+  });
+  return out;
+};
+
+// Kanaldan gelen ham yanıtı (nesne ya da metin) fiyat sözlüğüne çevirir.
+export const parseMarketResponse = (raw) => {
+  if (raw && typeof raw === 'object') return normalizePrices(raw);
+  const text = String(raw || '').trim();
+  if (!text) return {};
+  try {
+    return normalizePrices(JSON.parse(text));
+  } catch {
+    return parseHtmlPrices(text); // JSON değil: sayfa üzerinden oku
+  }
+};
+
 // Bir enstrümanın önceki kapanışı: servis kapanış vermezse günlük değişim
 // oranından (%) geriye doğru hesaplanır.
 export const previousClose = (row) => {
@@ -232,6 +314,15 @@ export const previousClose = (row) => {
   if (row.kapanis > 0) return row.kapanis;
   if (row.oran && row.oran !== -100) return row.alis / (1 + row.oran / 100);
   return row.alis;
+};
+
+// Günlük değişim yüzdesi. Kaynak kapanış/oran vermiyorsa null döner
+// (arayüzde "değişim yok" yerine hiçbir şey gösterilmemesi için).
+export const changePct = (row) => {
+  if (!row) return null;
+  if (!(row.kapanis > 0) && !row.oran) return null;
+  const prev = previousClose(row);
+  return prev ? ((row.alis - prev) / prev) * 100 : null;
 };
 
 // Fiyatı TL'ye çevirir (USD kotasyonlu enstrümanlar için USDTRY kullanılır)
@@ -258,7 +349,7 @@ const CHANNELS = [
     run: async ({ url, init }) => {
       const res = await window.saggDesktop.fetchMarketPrices({ url, method: init.method, headers: init.headers, body: init.body });
       if (!res || res.ok === false) throw new Error(res?.error || 'Masaüstü köprüsü yanıt vermedi');
-      return res.data;
+      return res.data; // metin ya da nesne
     },
   },
   {
@@ -267,7 +358,7 @@ const CHANNELS = [
     run: async ({ url, init }, signal) => {
       const res = await fetch(url, { ...init, signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      return res.text();
     },
   },
   ...CORS_PROXIES.map((build, i) => ({
@@ -278,7 +369,7 @@ const CHANNELS = [
       if (init.method && init.method !== 'GET') throw new Error('Aktarıcı bu isteği taşıyamaz');
       const res = await fetch(build(url), { signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return JSON.parse(await res.text());
+      return res.text();
     },
   })),
 ];
@@ -295,7 +386,7 @@ export async function fetchLivePrices({ signal, source } = {}) {
     if (!ch.available()) continue;
     try {
       const payload = await ch.run(request, signal);
-      const prices = normalizePrices(payload);
+      const prices = parseMarketResponse(payload);
       if (Object.keys(prices).length === 0) throw new Error('Fiyat listesi çözümlenemedi');
       preferredChannel = ch.id;
       return { prices, source: ch.id, provider: provider.id, fetchedAt: new Date() };
