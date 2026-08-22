@@ -29,6 +29,8 @@ olarak senkronize edilir.
   piyasa ticker'ıyla aynı kaynaktan, **Truncgil** (`finans.truncgil.com/v4`) üzerinden canlı
   alınır (60 sn'de bir yenilenir). Alım kaydında o günün fiyatı otomatik
   yazılır, maliyet–güncel değer–kar/zarar ve günlük değişim canlı hesaplanır.
+  Kaynağın yayımlamadığı sikke türleri (çeyrek, yarım, tam, ata, gremse, 5'li) gram has
+  altının ayar karşılığından hesaplanır ve "hesaplanan" olarak işaretlenir.
   Servis adresi ve (gerekiyorsa) API anahtarı sayfadaki **Veri Kaynağı** ekranından
   değiştirilebilir; alternatif sağlayıcı olarak datshop.com.tr ve Harem Altın da seçilebilir
   (JSON dönmeyen kaynaklarda sayfadaki fiyat tablosu okunur).

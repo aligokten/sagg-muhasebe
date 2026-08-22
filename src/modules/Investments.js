@@ -21,7 +21,7 @@ const PIE_COLORS = ['#f59e0b', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f47
 
 // --- Canlı fiyat akışı ---
 function useLivePrices(source) {
-  const [state, setState] = useState({ prices: {}, fetchedAt: null, channel: null, loading: true, error: null });
+  const [state, setState] = useState({ prices: {}, rawCodes: [], fetchedAt: null, channel: null, loading: true, error: null });
   const abortRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -30,8 +30,8 @@ function useLivePrices(source) {
     abortRef.current = ctrl;
     setState((s) => ({ ...s, loading: true }));
     try {
-      const { prices, source: channel, fetchedAt } = await fetchLivePrices({ signal: ctrl.signal, source });
-      setState({ prices, fetchedAt, channel, loading: false, error: null });
+      const { prices, rawCodes, source: channel, fetchedAt } = await fetchLivePrices({ signal: ctrl.signal, source });
+      setState({ prices, rawCodes, fetchedAt, channel, loading: false, error: null });
     } catch (err) {
       if (err?.name === 'AbortError') return;
       setState((s) => ({ ...s, loading: false, error: err?.message || 'Canlı fiyatlar alınamadı' }));
@@ -83,6 +83,7 @@ export function buildPortfolio(investments, prices) {
       ...g,
       avgCost: g.quantity ? g.cost / g.quantity : 0,
       unitPrice, prevPrice, value, profit, dailyChange, hasDaily,
+      derived: !!row?.derived,
       profitPct: g.cost ? (profit / g.cost) * 100 : 0,
       priced: !!row,
     };
@@ -148,7 +149,7 @@ const PriceChip = ({ code, row, prices }) => {
         {cur}{price2(row.alis)}
       </p>
       <p className="text-[11px] text-gray-500 mt-1">
-        Satış {cur}{price2(row.satis)}
+        {row.derived ? 'Hesaplanan · ' : ''}Satış {cur}{price2(row.satis)}
         {meta.currency === 'USD' && prices?.USDTRY ? ` · ₺${formatNumber(toTry(row.alis, code, prices), 0)}` : ''}
       </p>
     </Panel>
@@ -262,7 +263,7 @@ export function InvestmentForm({ existing, userId, prices, onClose }) {
 }
 
 // --- Veri kaynağı ayarları (sağlayıcı, uç nokta, opsiyonel anahtar) ---
-export function SourceForm({ source, onSave, onClose }) {
+export function SourceForm({ source, rawCodes = [], onSave, onClose }) {
   const [form, setForm] = useState({ ...source });
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const selectProvider = (e) => {
@@ -289,6 +290,12 @@ export function SourceForm({ source, onSave, onClose }) {
           <Input name="apiKey" value={form.apiKey || ''} onChange={set} placeholder="Gerekmiyorsa boş bırakın" />
         </Field>
       </div>
+      {rawCodes.length > 0 && (
+        <div className="mt-4 rounded-xl bg-gray-50 border border-gray-200 p-3">
+          <p className="text-xs font-medium text-gray-600 mb-1">Kaynaktan gelen kodlar ({rawCodes.length})</p>
+          <p className="text-[11px] text-gray-500 break-words leading-relaxed">{rawCodes.join(', ')}</p>
+        </div>
+      )}
       <p className="text-xs text-gray-400 mt-3">
         Adres bu tarayıcıda saklanır. Servisin yanıtı otomatik çözümlenir: kod → fiyat sözlüğü ya da
         liste biçimindeki JSON yanıtlar, alış/satış (alis, satis, buy, sell…) alanlarıyla eşleştirilir.
@@ -301,7 +308,7 @@ export function SourceForm({ source, onSave, onClose }) {
 export default function Investments({ data, userId }) {
   const { investments = [] } = data;
   const [source, setSourceState] = useState(getSource);
-  const { prices, fetchedAt, loading, error, reload } = useLivePrices(source);
+  const { prices, rawCodes, fetchedAt, loading, error, reload } = useLivePrices(source);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -451,7 +458,12 @@ export default function Investments({ data, userId }) {
                       </td>
                       <td className="px-2 py-3 text-right text-gray-300 whitespace-nowrap">{formatCurrency(r.avgCost)}</td>
                       <td className="px-2 py-3 text-right text-gray-300 whitespace-nowrap">
-                        {r.priced ? formatCurrency(r.unitPrice) : <span className="text-gray-600">-</span>}
+                        {r.priced ? (
+                          <>
+                            {formatCurrency(r.unitPrice)}
+                            {r.derived && <span className="text-amber-400/80 ml-0.5" title="Gram has altından hesaplandı">*</span>}
+                          </>
+                        ) : <span className="text-gray-600">-</span>}
                       </td>
                       <td className="px-2 py-3 text-right text-white font-medium whitespace-nowrap">
                         {r.priced ? formatCurrency(r.value) : <span className="text-gray-600">-</span>}
@@ -471,6 +483,11 @@ export default function Investments({ data, userId }) {
                 </tbody>
               </table>
             </div>
+          )}
+          {rows.some((r) => r.derived) && (
+            <p className="text-[11px] text-gray-500 mt-3">
+              * Kaynağın yayımlamadığı sikke türleri gram has altın üzerinden hesaplandı (işçilik payı hariç).
+            </p>
           )}
         </Panel>
 
@@ -577,7 +594,7 @@ export default function Investments({ data, userId }) {
       </Panel>
 
       {sourceOpen && (
-        <SourceForm source={source} onSave={saveSource} onClose={() => setSourceOpen(false)} />
+        <SourceForm source={source} rawCodes={rawCodes} onSave={saveSource} onClose={() => setSourceOpen(false)} />
       )}
       {formOpen && (
         <InvestmentForm

@@ -101,9 +101,9 @@ export const INSTRUMENTS = [
   { code: 'CEYREK_ESKI', label: 'Çeyrek Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['CEYREKESKI', 'ESKICEYREK'] },
   { code: 'YARIM_YENI', label: 'Yarım Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['YARIMYENI', 'YENIYARIM', 'YARIMALTIN', 'YARIM'] },
   { code: 'YARIM_ESKI', label: 'Yarım Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['YARIMESKI', 'ESKIYARIM'] },
-  { code: 'TEK_YENI', label: 'Tam Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['TEKYENI', 'TAMYENI', 'TAMALTIN', 'CUMHURIYETALTINI', 'CUMHURIYET', 'TAM', 'TEK', 'BIRLIKYENI'] },
+  { code: 'TEK_YENI', label: 'Tam Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['TEKYENI', 'TAMYENI', 'TAMALTIN', 'ZIYNETALTIN', 'TAM', 'TEK', 'BIRLIKYENI'] },
   { code: 'TEK_ESKI', label: 'Tam Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['TEKESKI', 'TAMESKI', 'BIRLIKESKI'] },
-  { code: 'ATA_YENI', label: 'Ata Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['ATAYENI', 'YENIATA', 'ATAALTIN', 'ATALIRA', 'ATA'] },
+  { code: 'ATA_YENI', label: 'Ata Altın (Yeni)', unit: 'adet', group: 'Altın', aliases: ['ATAYENI', 'YENIATA', 'ATAALTIN', 'ATALIRA', 'CUMHURIYETALTINI', 'CUMHURIYET', 'ATA'] },
   { code: 'ATA_ESKI', label: 'Ata Altın (Eski)', unit: 'adet', group: 'Altın', aliases: ['ATAESKI', 'ESKIATA'] },
   { code: 'ATA5_YENI', label: "5'li Ata (Yeni)", unit: 'adet', group: 'Altın', aliases: ['ATA5YENI', 'BESLIATAYENI'] },
   { code: 'ATA5_ESKI', label: "5'li Ata (Eski)", unit: 'adet', group: 'Altın', aliases: ['ATA5ESKI', 'BESLIATAESKI'] },
@@ -149,7 +149,45 @@ const ALIAS_TO_CODE = (() => {
   return map;
 })();
 
-export const resolveCode = (raw) => ALIAS_TO_CODE[normalizeKey(raw)] || null;
+// Sağlayıcılar aynı ürünü farklı yazabilir ("YENI_CEYREK_ALTIN", "ceyrek-altin",
+// "Çeyrek Altın (Yeni)"). Birebir eşleşme bulunamazsa belirteç bazlı eşleme
+// denenir: kural sırayla değerlendirilir, ilk uyan kazanır.
+// [kod, bulunması gerekenler (hepsi), bulunmaması gerekenler]
+const TOKEN_RULES = [
+  ['ATA5_ESKI', [['ATA'], ['5', 'BESLI'], ['ESKI']], []],
+  ['ATA5_YENI', [['ATA'], ['5', 'BESLI']], ['ESKI']],
+  ['GREMESE_ESKI', [['GREMSE', 'GREMESE'], ['ESKI']], []],
+  ['GREMESE_YENI', [['GREMSE', 'GREMESE']], ['ESKI']],
+  ['CEYREK_ESKI', [['CEYREK'], ['ESKI']], []],
+  ['CEYREK_YENI', [['CEYREK']], ['ESKI']],
+  ['YARIM_ESKI', [['YARIM'], ['ESKI']], []],
+  ['YARIM_YENI', [['YARIM']], ['ESKI']],
+  ['ATA_ESKI', [['ATA', 'CUMHURIYET'], ['ESKI']], ['5', 'BESLI']],
+  ['ATA_YENI', [['ATA', 'CUMHURIYET']], ['ESKI', '5', 'BESLI']],
+  ['TEK_ESKI', [['TAM', 'ZIYNET', 'BIRLIK'], ['ESKI']], []],
+  ['TEK_YENI', [['TAM', 'ZIYNET', 'BIRLIK']], ['ESKI']],
+  ['AYAR22', [['22'], ['AYAR', 'BILEZIK']], []],
+  ['AYAR14', [['14'], ['AYAR']], []],
+  ['KULCEALTIN', [['KULCE']], []],
+  ['ALTIN', [['GRAM', 'HAS'], ['ALTIN']], ['GUMUS']],
+  ['GUMUSUSD', [['GUMUS'], ['ONS', 'USD']], []],
+  ['GUMUSTRY', [['GUMUS']], ['ONS', 'USD']],
+  ['ONS', [['ONS']], ['GUMUS']],
+];
+
+const matchTokens = (key, rule) => {
+  const [, required, forbidden] = rule;
+  if (forbidden.some((t) => key.includes(t))) return false;
+  return required.every((group) => group.some((t) => key.includes(t)));
+};
+
+export const resolveCode = (raw) => {
+  const key = normalizeKey(raw);
+  if (!key) return null;
+  if (ALIAS_TO_CODE[key]) return ALIAS_TO_CODE[key];
+  const rule = TOKEN_RULES.find((r) => matchTokens(key, r));
+  return rule ? rule[0] : null;
+};
 
 // "2.529,50" / "2529.5900" / 2529.59 -> 2529.59
 export const parseAmount = (raw) => {
@@ -328,6 +366,44 @@ export const previousClose = (row) => {
   return row.alis;
 };
 
+// --- Kaynakta olmayan sikke türlerini gram has altından türetme ---
+// Değerler ziynet/Cumhuriyet altınlarının has altın (24 ayar) karşılığıdır:
+// çeyrek 1,75 g × 0,916; ata (Cumhuriyet) 7,216 g × 0,916; gremse 2,5 ata; 5'li 5 ata.
+// Kaynak bu türleri yayımlamıyorsa fiyat buradan hesaplanır ve "hesaplanan"
+// olarak işaretlenir (piyasadaki işçilik payını içermez).
+export const FINE_GOLD_FACTORS = {
+  KULCEALTIN: 1,
+  AYAR22: 0.916,
+  AYAR14: 0.585,
+  CEYREK_YENI: 1.6033, CEYREK_ESKI: 1.6033,
+  YARIM_YENI: 3.2066, YARIM_ESKI: 3.2066,
+  TEK_YENI: 6.4132, TEK_ESKI: 6.4132,
+  ATA_YENI: 6.6099, ATA_ESKI: 6.6099,
+  GREMESE_YENI: 16.5248, GREMESE_ESKI: 16.5248,
+  ATA5_YENI: 33.0495, ATA5_ESKI: 33.0495,
+};
+
+export const deriveMissingPrices = (prices) => {
+  const gram = prices.ALTIN;
+  if (!gram || !(gram.alis > 0)) return prices;
+  const out = { ...prices };
+  Object.entries(FINE_GOLD_FACTORS).forEach(([code, factor]) => {
+    if (out[code]) return;
+    out[code] = {
+      code,
+      alis: gram.alis * factor,
+      satis: (gram.satis || gram.alis) * factor,
+      kapanis: gram.kapanis > 0 ? gram.kapanis * factor : 0,
+      oran: gram.oran,
+      dusuk: 0,
+      yuksek: 0,
+      tarih: gram.tarih,
+      derived: true, // gram has altından hesaplandı
+    };
+  });
+  return out;
+};
+
 // Günlük değişim yüzdesi. Kaynak kapanış/oran vermiyorsa null döner
 // (arayüzde "değişim yok" yerine hiçbir şey gösterilmemesi için).
 export const changePct = (row) => {
@@ -398,10 +474,12 @@ export async function fetchLivePrices({ signal, source } = {}) {
     if (!ch.available()) continue;
     try {
       const payload = await ch.run(request, signal);
-      const prices = parseMarketResponse(payload);
-      if (Object.keys(prices).length === 0) throw new Error('Fiyat listesi çözümlenemedi');
+      const parsed = parseMarketResponse(payload);
+      if (Object.keys(parsed).length === 0) throw new Error('Fiyat listesi çözümlenemedi');
+      // Kaynağın yayımlamadığı sikke türleri gram has altından tamamlanır.
+      const prices = deriveMissingPrices(parsed);
       preferredChannel = ch.id;
-      return { prices, source: ch.id, provider: provider.id, fetchedAt: new Date() };
+      return { prices, rawCodes: Object.keys(parsed), source: ch.id, provider: provider.id, fetchedAt: new Date() };
     } catch (err) {
       if (err?.name === 'AbortError') throw err;
       lastError = err;
