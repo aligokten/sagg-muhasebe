@@ -59,17 +59,25 @@ export const cariMovements = (customerId, data, projectId = null) => {
       let borc = 0;
       let alacak = 0;
       let label = t.description || '';
+      // Ekstrede işlem sütununda hareketin kendi türü yazar:
+      // Tahsilat / Ödeme / Satış (cariye borç) / Alış (cariye alacak).
+      let kind;
       if (t.type === 'tahsilat') {
         alacak = amt;
+        kind = 'Tahsilat';
         label = label || 'Tahsilat';
       } else if (t.type === 'odeme') {
         borc = amt;
+        kind = 'Ödeme';
         label = label || 'Ödeme';
+      } else if (t.cariEffect === 'borc') {
+        borc = amt;
+        kind = 'Satış';
       } else {
-        if (t.cariEffect === 'borc') borc = amt;
-        else alacak = amt;
+        alacak = amt;
+        kind = 'Alış';
       }
-      rows.push({ date: t.date, type: 'Hareket', description: label, category: t.category || '', borc, alacak, projectId: t.projectId || null, projectName: projName(t.projectId), ref: { kind: 'transaction', id: t.id } });
+      rows.push({ date: t.date, type: kind, description: label, category: t.category || '', borc, alacak, projectId: t.projectId || null, projectName: projName(t.projectId), ref: { kind: 'transaction', id: t.id } });
     });
 
   checks

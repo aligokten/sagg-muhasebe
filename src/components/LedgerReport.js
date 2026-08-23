@@ -16,6 +16,33 @@ const printStyles = `@media print{
   .no-print{display:none}
 }`;
 
+// Tablo başlık satırını, rapor kabıyla aynı genişlik ve yatay boşlukta ayrı
+// bir görsele çevirir; böylece PDF'te sayfa başına eklendiğinde sütunlar
+// içerikle birebir hizalanır.
+async function captureTableHeader(el) {
+  const table = el.querySelector('table');
+  const thead = table && table.querySelector('thead');
+  if (!thead) return null;
+  const cs = getComputedStyle(el);
+  const holder = document.createElement('div');
+  holder.style.cssText = `position:fixed;left:-10000px;top:0;background:#ffffff;width:${el.offsetWidth}px;`;
+  holder.style.paddingLeft = cs.paddingLeft;
+  holder.style.paddingRight = cs.paddingRight;
+  const clone = document.createElement('table');
+  clone.className = table.className;
+  clone.style.width = '100%';
+  clone.style.borderCollapse = 'collapse';
+  clone.appendChild(thead.cloneNode(true));
+  holder.appendChild(clone);
+  document.body.appendChild(holder);
+  try {
+    const c = await window.html2canvas(holder, { scale: 2, backgroundColor: '#ffffff' });
+    return { dataUrl: c.toDataURL('image/jpeg', 0.92), width: c.width, height: c.height };
+  } finally {
+    document.body.removeChild(holder);
+  }
+}
+
 export default function LedgerReport({ heading, customer, project, rows, balance, showProject, companyProfile, scriptsLoaded, onClose }) {
   const printRef = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -44,8 +71,11 @@ export default function LedgerReport({ heading, customer, project, rows, balance
       const margin = 10;
       const contentW = pdf.internal.pageSize.getWidth() - margin * 2;   // 190mm
       const contentH = pdf.internal.pageSize.getHeight() - margin * 2;  // 277mm
-      // Sayfa başına düşen kaynak piksel yüksekliği
-      const sliceH = Math.floor((canvas.width * contentH) / contentW);
+
+      // Tablo başlığını ayrı yakala: 2. sayfadan itibaren her sayfanın
+      // başına eklenir (1. sayfada zaten akışın içinde geliyor).
+      const headImg = await captureTableHeader(el);
+      const headMm = headImg ? (headImg.height * contentW) / headImg.width : 0;
 
       // Satırların canvas üzerindeki alt sınırları — sayfa kesikleri buralara
       // hizalanır ki bir tablo satırı iki sayfaya bölünmesin.
@@ -56,21 +86,25 @@ export default function LedgerReport({ heading, customer, project, rows, balance
         .filter((v) => v > 0 && v < canvas.height);
 
       // Kesme noktalarını hesapla: her sayfaya sığan son satır sınırında böl.
+      // İlk sayfa tam yükseklik, sonrakiler tekrar eden başlık kadar daha kısa.
       const cuts = [];
       let pos = 0;
       while (pos < canvas.height) {
         const start = pos;
-        const limit = start + sliceH;
-        if (limit >= canvas.height) { cuts.push([start, canvas.height - start]); break; }
+        const isFirst = cuts.length === 0;
+        const capMm = isFirst ? contentH : contentH - headMm;
+        const capPx = Math.floor((canvas.width * capMm) / contentW);
+        const limit = start + capPx;
+        if (limit >= canvas.height) { cuts.push([start, canvas.height - start, isFirst]); break; }
         const fit = rowEdges.filter((e) => e > start && e <= limit).pop();
         // Uygun satır sınırı yoksa (ör. tek parça çok uzun) sabit yükseklikte böl
         const end = fit || limit;
-        cuts.push([start, end - start]);
+        cuts.push([start, end - start, isFirst]);
         pos = end;
       }
 
       for (let i = 0; i < cuts.length; i++) {
-        const [y, h] = cuts[i];
+        const [y, h, isFirst] = cuts[i];
         const part = document.createElement('canvas');
         part.width = canvas.width;
         part.height = h;
@@ -79,9 +113,14 @@ export default function LedgerReport({ heading, customer, project, rows, balance
         ctx.fillRect(0, 0, part.width, part.height);
         ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
         if (i > 0) pdf.addPage();
+        let top = margin;
+        if (!isFirst && headImg) {
+          pdf.addImage(headImg.dataUrl, 'JPEG', margin, top, contentW, headMm);
+          top += headMm;
+        }
         // Beyaz zeminli metin belgesi JPEG ile çok daha küçük dosya üretir
         // (PNG ile uzun ekstreler onlarca MB'a çıkıyor).
-        pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, contentW, (h * contentW) / canvas.width);
+        pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', margin, top, contentW, (h * contentW) / canvas.width);
       }
       pdf.save(`${fileBase}.pdf`);
     } catch (e) {
