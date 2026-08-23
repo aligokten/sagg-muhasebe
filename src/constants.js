@@ -4,6 +4,7 @@ export const COLLECTIONS = [
   'transactions', 'accounts', 'expenses', 'incomes', 'checks',
   'personnel', 'stockMovements', 'reminders',
   'subcontractors', 'contractorAssignments', 'projectLinks', 'zReports',
+  'creditCards', 'creditCardPayments',
 ];
 
 // "name" alanına göre alfabetik listelenen koleksiyonlar (cari, müellif,
@@ -11,6 +12,7 @@ export const COLLECTIONS = [
 // koleksiyonları tarih/numara sırasında kaldığı için buraya dahil değildir.
 export const NAME_SORTED_COLLECTIONS = [
   'customers', 'authors', 'subcontractors', 'personnel', 'products', 'accounts', 'projects',
+  'creditCards',
 ];
 
 // Abonelik paketi seçenekleri (müşteri seçimi + yönetici fiyatlandırması ortak anahtarları)
