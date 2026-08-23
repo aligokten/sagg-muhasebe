@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
   Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
   TrendingUp, X, DraftingCompass, LogOut, Cloud, ListChecks, Calculator,
-  HardHat, FileBarChart, ShieldCheck, Lock,
+  HardHat, FileBarChart, ShieldCheck, Lock, CreditCard,
 } from 'lucide-react';
 
 import {
@@ -29,6 +29,7 @@ import Quotes from './modules/Quotes';
 import Orders from './modules/Orders';
 import Waybills from './modules/Waybills';
 import Accounts from './modules/Accounts';
+import CreditCards from './modules/CreditCards';
 import Checks from './modules/Checks';
 import CashFlow from './modules/CashFlow';
 import Personnel from './modules/Personnel';
@@ -74,6 +75,7 @@ const NAV_GROUPS = [
     title: 'Finans',
     items: [
       { id: 'accounts', label: 'Kasa & Banka', icon: Landmark },
+      { id: 'creditcards', label: 'Kredi Kartı Borç Durumu', icon: CreditCard },
       { id: 'checks', label: 'Çek & Senet', icon: ScrollText },
       { id: 'cashflow', label: 'Gelir & Gider', icon: TrendingUp },
       { id: 'activity', label: 'Tüm İşlemler', icon: ListChecks },
@@ -346,6 +348,7 @@ export default function App() {
       case 'products': return <Products data={fullData} userId={userId} />;
       case 'personnel': return <Personnel data={fullData} userId={userId} />;
       case 'accounts': return <Accounts data={fullData} userId={userId} />;
+      case 'creditcards': return <CreditCards data={fullData} userId={userId} />;
       case 'checks': return <Checks data={fullData} userId={userId} />;
       case 'cashflow': return <CashFlow data={fullData} userId={userId} />;
       case 'activity': return <AllTransactions data={fullData} userId={userId} />;
