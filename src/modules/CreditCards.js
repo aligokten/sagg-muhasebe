@@ -41,6 +41,18 @@ export const cardPeriodPayments = (card, payments) => {
 export const cardRemaining = (card, payments) =>
   (Number(card.statementDebt) || 0) - sum(cardPeriodPayments(card, payments), (p) => p.amount);
 
+// Limitten düşen toplam kullanım: kalan ekstre borcu + henüz ekstreye
+// yansımamış gelecek dönem harcamaları.
+export const cardUsed = (card, payments) =>
+  Math.max(0, cardRemaining(card, payments)) + (Number(card.nextPeriodDebt) || 0);
+
+// Kullanılabilir limit (limit girilmemişse null)
+export const cardAvailable = (card, payments) => {
+  const limit = Number(card.limit) || 0;
+  if (!limit) return null;
+  return limit - cardUsed(card, payments);
+};
+
 // Son ödeme tarihine kalan gün / gecikme durumu
 export const dueMeta = (card, remaining) => {
   const due = toDate(card.dueDate);
@@ -59,8 +71,10 @@ export const dueMeta = (card, remaining) => {
 function CardVisual({ card, remaining, meta, compact }) {
   const c = colorOf(card.color);
   const limit = Number(card.limit) || 0;
-  const used = Math.max(0, remaining);
+  // Limit kullanımı kalan ekstre borcu + gelecek dönem borcunu kapsar
+  const used = Math.max(0, remaining ?? 0) + (Number(card.nextPeriodDebt) || 0);
   const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : null;
+  const available = limit > 0 ? limit - used : null;
   return (
     <div
       className="relative w-full rounded-2xl text-white overflow-hidden shadow-lg"
@@ -85,8 +99,18 @@ function CardVisual({ card, remaining, meta, compact }) {
         <div className="w-9 h-6 rounded-md" style={{ background: 'linear-gradient(135deg,#f5d68a,#c9a227)' }} />
 
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-white/70">Kalan Borç</p>
-          <p className="text-xl font-bold leading-tight">{formatCurrency(Math.max(0, remaining ?? 0))}</p>
+          <div className="flex justify-between items-end gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-white/70">Kalan Borç</p>
+              <p className="text-xl font-bold leading-tight">{formatCurrency(Math.max(0, remaining ?? 0))}</p>
+            </div>
+            {available !== null && (
+              <div className="text-right min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-white/70">Kullanılabilir</p>
+                <p className={`text-base font-semibold leading-tight ${available < 0 ? 'text-red-200' : ''}`}>{formatCurrency(available)}</p>
+              </div>
+            )}
+          </div>
           {pct !== null && (
             <div className="mt-2">
               <div className="h-1 rounded-full bg-white/25 overflow-hidden">
@@ -117,7 +141,7 @@ function CardForm({ existing, userId, onClose }) {
           statementDate: existing.statementDate ? toInputDate(existing.statementDate) : '',
           dueDate: existing.dueDate ? toInputDate(existing.dueDate) : '',
         }
-      : { name: '', bank: '', color: 'black', limit: '', statementDebt: '', statementDate: todayInput(), dueDate: '', note: '' }
+      : { name: '', bank: '', color: 'black', limit: '', statementDebt: '', nextPeriodDebt: '', statementDate: todayInput(), dueDate: '', note: '' }
   );
   const set = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const submit = async (e) => {
@@ -127,6 +151,7 @@ function CardForm({ existing, userId, onClose }) {
       ...form,
       limit: Number(form.limit) || 0,
       statementDebt: Number(form.statementDebt) || 0,
+      nextPeriodDebt: Number(form.nextPeriodDebt) || 0,
       statementDate: form.statementDate ? Timestamp.fromDate(new Date(form.statementDate)) : null,
       dueDate: form.dueDate ? Timestamp.fromDate(new Date(form.dueDate)) : null,
     };
@@ -178,13 +203,14 @@ function CardForm({ existing, userId, onClose }) {
         <Field label="Banka"><Input name="bank" value={form.bank} onChange={set} placeholder="örn. Garanti BBVA" /></Field>
         <Field label="Kart Limiti"><Input type="number" step="0.01" name="limit" value={form.limit} onChange={set} /></Field>
         <Field label="Ekstre Borcu (hesap kesiminde)"><Input type="number" step="0.01" name="statementDebt" value={form.statementDebt} onChange={set} /></Field>
+        <Field label="Gelecek Dönem Borcu"><Input type="number" step="0.01" name="nextPeriodDebt" value={form.nextPeriodDebt} onChange={set} placeholder="Ekstreye yansımamış harcamalar" /></Field>
         <Field label="Hesap Kesim Tarihi"><Input type="date" name="statementDate" value={form.statementDate} onChange={set} /></Field>
         <Field label="Son Ödeme Tarihi"><Input type="date" name="dueDate" value={form.dueDate} onChange={set} /></Field>
-        <div />
         <Field label="Not" className="md:col-span-2"><Textarea name="note" value={form.note} onChange={set} /></Field>
       </div>
       <p className="text-xs text-gray-400 mt-3">
         Kalan borç, ekstre borcundan hesap kesim tarihinden sonra girilen ödemeler düşülerek hesaplanır.
+        Kullanılabilir limit ise kalan borç <b>ve</b> gelecek dönem borcu limitten düşülerek bulunur.
       </p>
     </FormModal>
   );
@@ -194,6 +220,7 @@ function CardForm({ existing, userId, onClose }) {
 function StatementForm({ card, userId, onClose }) {
   const [form, setForm] = useState({
     statementDebt: '',
+    nextPeriodDebt: '',
     statementDate: todayInput(),
     dueDate: card.dueDate ? toInputDate(card.dueDate) : '',
   });
@@ -203,6 +230,7 @@ function StatementForm({ card, userId, onClose }) {
     try {
       await updateRecord(userId, 'creditCards', card.id, {
         statementDebt: Number(form.statementDebt) || 0,
+        nextPeriodDebt: Number(form.nextPeriodDebt) || 0,
         statementDate: form.statementDate ? Timestamp.fromDate(new Date(form.statementDate)) : null,
         dueDate: form.dueDate ? Timestamp.fromDate(new Date(form.dueDate)) : null,
       });
@@ -213,12 +241,14 @@ function StatementForm({ card, userId, onClose }) {
     <FormModal title={`${card.name} — Yeni Ekstre`} onSubmit={submit} onClose={onClose} submitLabel="Ekstreyi Kaydet">
       <div className="grid grid-cols-1 gap-4">
         <Field label="Toplam Ekstre Borcu"><Input type="number" step="0.01" name="statementDebt" value={form.statementDebt} onChange={set} required autoFocus /></Field>
+        <Field label="Gelecek Dönem Borcu"><Input type="number" step="0.01" name="nextPeriodDebt" value={form.nextPeriodDebt} onChange={set} placeholder="0" /></Field>
         <Field label="Hesap Kesim Tarihi"><Input type="date" name="statementDate" value={form.statementDate} onChange={set} required /></Field>
         <Field label="Son Ödeme Tarihi"><Input type="date" name="dueDate" value={form.dueDate} onChange={set} /></Field>
       </div>
       <p className="text-xs text-gray-400 mt-3">
         Yeni ekstre kaydedildiğinde kalan borç bu tutardan başlar; bu tarihten sonra eklediğiniz ödemeler düşülür.
-        Önceki dönem ödemeleri geçmişte kalır, silinmez.
+        Önceki dönem ödemeleri geçmişte kalır, silinmez. Hesap kesiminde gelecek dönem harcamaları ekstreye
+        yansıdığı için bu alan boş bırakılırsa sıfırlanır.
       </p>
     </FormModal>
   );
@@ -280,6 +310,8 @@ function CardDetail({ card, data, userId, onBack }) {
   const meta = dueMeta(card, remaining);
   const older = allPayments.filter((p) => !periodPayments.some((q) => q.id === p.id));
   const limit = Number(card.limit) || 0;
+  const nextDebt = Number(card.nextPeriodDebt) || 0;
+  const available = limit ? limit - (Math.max(0, remaining) + nextDebt) : null;
 
   return (
     <div>
@@ -294,7 +326,7 @@ function CardDetail({ card, data, userId, onBack }) {
             <Button icon={Banknote} onClick={() => setPayOpen(true)}>Ödeme Ekle</Button>
             <Button icon={FileText} variant="secondary" onClick={() => setStmtOpen(true)}>Yeni Ekstre</Button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
             <div className="p-3 rounded-xl border border-gray-100 bg-white">
               <p className="text-xs text-gray-500">Ekstre Borcu</p>
               <p className="text-lg font-bold text-gray-800">{formatCurrency(card.statementDebt)}</p>
@@ -311,8 +343,13 @@ function CardDetail({ card, data, userId, onBack }) {
               {remaining < -0.01 && <p className="text-[11px] text-gray-400">{formatCurrency(-remaining)} fazla ödeme</p>}
             </div>
             <div className="p-3 rounded-xl border border-gray-100 bg-white">
+              <p className="text-xs text-gray-500">Gelecek Dönem Borcu</p>
+              <p className="text-lg font-bold text-gray-800">{formatCurrency(nextDebt)}</p>
+              <p className="text-[11px] text-gray-400">Ekstreye yansımadı</p>
+            </div>
+            <div className="p-3 rounded-xl border border-gray-100 bg-white">
               <p className="text-xs text-gray-500">Kullanılabilir Limit</p>
-              <p className="text-lg font-bold text-gray-800">{limit ? formatCurrency(limit - Math.max(0, remaining)) : '-'}</p>
+              <p className={`text-lg font-bold ${available !== null && available < 0 ? 'text-red-600' : 'text-gray-800'}`}>{available !== null ? formatCurrency(available) : '-'}</p>
               <p className="text-[11px] text-gray-400">{limit ? `Limit: ${formatCurrency(limit)}` : 'Limit girilmedi'}</p>
             </div>
           </div>
@@ -393,8 +430,11 @@ export default function CreditCards({ data, userId }) {
 
   const totalLimit = rows.reduce((s, c) => s + (Number(c.limit) || 0), 0);
   const totalDebt = rows.reduce((s, c) => s + Math.max(0, c._remaining), 0);
-  const available = Math.max(0, totalLimit - totalDebt);
-  const usePct = totalLimit > 0 ? Math.min(100, (totalDebt / totalLimit) * 100) : 0;
+  const totalNext = rows.reduce((s, c) => s + (Number(c.nextPeriodDebt) || 0), 0);
+  // Limit kullanımı: kalan ekstre borcu + gelecek dönem borçları
+  const totalUsed = totalDebt + totalNext;
+  const available = Math.max(0, totalLimit - totalUsed);
+  const usePct = totalLimit > 0 ? Math.min(100, (totalUsed / totalLimit) * 100) : 0;
 
   // Yaklaşan borçlar: 7 gün içinde son ödeme tarihi dolan ya da gecikmiş kartlar
   const upcoming = useMemo(
@@ -428,7 +468,7 @@ export default function CreditCards({ data, userId }) {
           <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden mt-3">
             <div className={`h-full ${usePct > 80 ? 'bg-red-500' : usePct > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${usePct}%` }} />
           </div>
-          <p className="text-xs text-gray-400 mt-1.5">Kullanılabilir: <b className="text-gray-600">{formatCurrency(available)}</b></p>
+          <p className="text-xs text-gray-400 mt-1.5">Kullanılabilir: <b className="text-green-600">{formatCurrency(available)}</b></p>
         </div>
 
         <div className="p-5 rounded-2xl bg-white border border-gray-100 shadow-sm">
@@ -440,6 +480,9 @@ export default function CreditCards({ data, userId }) {
           <p className="text-xs text-gray-400 mt-3">
             {creditCards.length} kart · Limit kullanımı <b className="text-gray-600">%{usePct.toFixed(0)}</b>
           </p>
+          {totalNext > 0.01 && (
+            <p className="text-xs text-gray-400 mt-1">Gelecek dönem: <b className="text-gray-600">{formatCurrency(totalNext)}</b></p>
+          )}
         </div>
 
         <div className={`p-5 rounded-2xl border shadow-sm ${overdue > 0 ? 'bg-red-50 border-red-100' : upcoming.length > 0 ? 'bg-yellow-50 border-yellow-100' : 'bg-white border-gray-100'}`}>
@@ -481,6 +524,12 @@ export default function CreditCards({ data, userId }) {
                   Ekstre: <b className="text-gray-700">{formatCurrency(c.statementDebt)}</b>
                   <span className="mx-1">·</span>
                   Ödenen: <b className="text-green-600">{formatCurrency(c._paid)}</b>
+                  {Number(c.nextPeriodDebt) > 0 && (
+                    <>
+                      <span className="mx-1">·</span>
+                      Gelecek: <b className="text-gray-700">{formatCurrency(c.nextPeriodDebt)}</b>
+                    </>
+                  )}
                 </div>
                 <div className="flex gap-1">
                   <button title="Ödeme ekle" onClick={() => setPayFor(c)} className="p-2 rounded-full hover:bg-gray-100 text-green-600"><Banknote size={16} /></button>
