@@ -1,18 +1,24 @@
-// --- Paylaşılan arayüz bileşenleri ---
+// --- Paylaşılan arayüz bileşenleri — SWISS DATA POP ---
+// Tipografi: Inter Tight (başlık/rakam, 700-900, sıkı harf aralığı) + Inter (gövde).
+// Yüzeyler: 1px kenarlıklı, yuvarlatılmış bento kartlar; gölge yerine kenarlık.
+// Vurgu: tek bir vermilyon (#F43B04). Çok renkli dağınıklık yok.
 import React, { useState } from 'react';
 import { X, PlusCircle, Inbox, MoreVertical } from 'lucide-react';
 
 export const Spinner = () => (
   <div className="flex items-center justify-center h-full py-20">
-    <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-orange-500"></div>
+    <div className="w-12 h-12 rounded-full border-[3px] border-gridline border-t-accent animate-spin" />
   </div>
 );
 
 export const PageHeader = ({ title, subtitle, children }) => (
-  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-3">
-    <div>
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">{title}</h1>
-      {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end mb-8 gap-4">
+    <div className="min-w-0">
+      <div className="h-1 w-10 bg-accent rounded-full mb-3" aria-hidden="true" />
+      <h1 className="font-display text-[28px] sm:text-[36px] leading-[1.05] font-extrabold tracking-hero text-ink">
+        {title}
+      </h1>
+      {subtitle && <p className="text-sm text-muted mt-2">{subtitle}</p>}
     </div>
     {children && <div className="flex items-center gap-2 flex-wrap">{children}</div>}
   </div>
@@ -20,18 +26,18 @@ export const PageHeader = ({ title, subtitle, children }) => (
 
 export const Button = ({ children, variant = 'primary', icon: Icon, className = '', ...props }) => {
   const variants = {
-    primary: 'bg-orange-600 text-white hover:bg-orange-700 focus:ring-orange-300',
-    secondary: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-200',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-300',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-300',
-    ghost: 'text-gray-600 hover:bg-gray-100',
+    primary: 'bg-accent text-white hover:bg-accent-hover border border-transparent',
+    secondary: 'bg-elevated border border-line text-ink hover:bg-surface',
+    success: 'bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent',
+    danger: 'bg-red-600 text-white hover:bg-red-700 border border-transparent',
+    ghost: 'bg-transparent border border-transparent text-muted hover:bg-surface hover:text-ink',
   };
   return (
     <button
-      className={`flex items-center justify-center px-4 py-2 rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-4 text-sm font-medium ${variants[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-pop text-sm font-semibold tracking-[-0.01em] transition-colors duration-120 ease-pop ${variants[variant]} ${className}`}
       {...props}
     >
-      {Icon && <Icon className="h-4 w-4 mr-2" />}
+      {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
       {children}
     </button>
   );
@@ -42,10 +48,12 @@ export const AddButton = ({ label = 'Yeni Ekle', onClick }) => (
 );
 
 export const Card = ({ title, children, className = '', actions }) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 ${className}`}>
+  <div className={`bg-elevated rounded-bento border border-line overflow-hidden ${className}`}>
     {(title || actions) && (
-      <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
-        {title && <h3 className="text-lg font-semibold text-gray-700">{title}</h3>}
+      <div className="flex justify-between items-center gap-3 px-6 py-4 border-b border-line">
+        {title && (
+          <h3 className="font-display text-base font-bold tracking-display text-ink">{title}</h3>
+        )}
         {actions}
       </div>
     )}
@@ -53,69 +61,76 @@ export const Card = ({ title, children, className = '', actions }) => (
   </div>
 );
 
-export const StatCard = ({ title, value, color = 'text-gray-700', icon: Icon, hint }) => (
-  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-    <div className="flex flex-col">
-      <h4 className="text-sm font-medium text-gray-500">{title}</h4>
-      <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
-      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+// Bento istatistik kutusu: etiket küçük ve versal, değer iri ve sıkı aralıklı.
+export const StatCard = ({ title, value, color = 'text-ink', icon: Icon, hint }) => (
+  <div className="bg-elevated p-5 rounded-bento border border-line">
+    {/* Etiket ve ikon üst satırda durur; böylece rakam kutunun tam
+        genişliğini kullanır ve para değerleri ortasından kırılmaz. */}
+    <div className="flex items-start justify-between gap-3">
+      <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{title}</h4>
+      {Icon && (
+        <div className="p-2 rounded-pop bg-surface border border-line flex-shrink-0 -mt-1 -mr-1">
+          <Icon className={`h-4 w-4 ${color}`} />
+        </div>
+      )}
     </div>
-    {Icon && (
-      <div className={`p-3 rounded-full bg-opacity-10 ${color.replace('text', 'bg').replace('-600', '-100').replace('-700', '-100')}`}>
-        <Icon className={`h-7 w-7 ${color}`} />
-      </div>
-    )}
+    <p className={`font-display text-[clamp(20px,1.9vw,28px)] leading-[1.1] font-extrabold tracking-hero tabular-nums mt-3 break-words ${color}`}>
+      {value}
+    </p>
+    {hint && <p className="text-xs text-muted mt-2">{hint}</p>}
   </div>
 );
 
 export const Badge = ({ children, color = 'gray' }) => {
   const colors = {
-    gray: 'bg-gray-100 text-gray-700',
-    green: 'bg-green-100 text-green-700',
-    red: 'bg-red-100 text-red-700',
-    yellow: 'bg-yellow-100 text-yellow-700',
-    blue: 'bg-blue-100 text-blue-700',
-    sky: 'bg-orange-100 text-orange-700',
-    purple: 'bg-purple-100 text-purple-700',
+    gray: 'bg-surface text-muted border-line',
+    green: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    red: 'bg-red-50 text-red-700 border-red-200',
+    yellow: 'bg-amber-50 text-amber-800 border-amber-200',
+    blue: 'bg-sky-50 text-sky-700 border-sky-200',
+    sky: 'bg-accent-soft text-accent-text border-transparent',
+    purple: 'bg-violet-50 text-violet-700 border-violet-200',
   };
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[color] || colors.gray}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-[0.08em] ${colors[color] || colors.gray}`}>
       {children}
     </span>
   );
 };
 
 export const EmptyState = ({ message = 'Henüz kayıt yok', icon: Icon = Inbox }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-    <Icon className="h-12 w-12 mb-3" />
-    <p className="text-sm">{message}</p>
+  <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+    <div className="h-14 w-14 rounded-bento border border-line pop-dots flex items-center justify-center mb-4">
+      <Icon className="h-6 w-6 text-muted" />
+    </div>
+    <p className="text-sm text-muted max-w-sm">{message}</p>
   </div>
 );
 
 // --- Tablo bileşenleri ---
 export const Table = ({ headers, children }) => (
   <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200">
+    <table className="min-w-full">
       <thead>
-        <tr className="bg-gray-50">
+        <tr className="bg-surface border-b border-gridline">
           {headers.map((h, i) => (
             <th
               key={i}
-              className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${h.align === 'right' ? 'text-right' : 'text-left'}`}
+              className={`px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-[0.12em] ${h.align === 'right' ? 'text-right' : 'text-left'}`}
             >
               {h.label}
             </th>
           ))}
         </tr>
       </thead>
-      <tbody className="bg-white divide-y divide-gray-200">{children}</tbody>
+      <tbody className="bg-elevated divide-y divide-line">{children}</tbody>
     </table>
   </div>
 );
 
 export const Td = ({ children, align = 'left', wrap = false, className = '', ...props }) => (
   <td
-    className={`px-4 py-3 text-sm ${wrap ? 'whitespace-normal break-words' : 'whitespace-nowrap'} ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}
+    className={`px-4 py-3 text-sm ${wrap ? 'whitespace-normal break-words' : 'whitespace-nowrap'} ${align === 'right' ? 'text-right tabular-nums' : 'text-left'} ${className}`}
     {...props}
   >
     {children}
@@ -125,13 +140,16 @@ export const Td = ({ children, align = 'left', wrap = false, className = '', ...
 // --- Form girişleri ---
 export const Field = ({ label, children, className = '' }) => (
   <label className={`flex flex-col ${className}`}>
-    {label && <span className="text-sm font-medium text-gray-600 mb-1">{label}</span>}
+    {label && (
+      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted mb-1.5">{label}</span>
+    )}
     {children}
   </label>
 );
 
 const inputClass =
-  'p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none w-full bg-white text-gray-900 placeholder-gray-400 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600 dark:placeholder-gray-400';
+  'px-3 py-2.5 min-h-[44px] border border-line rounded-pop bg-elevated text-ink placeholder-muted w-full ' +
+  'outline-none transition-colors duration-120 ease-pop focus:border-accent focus:ring-2 focus:ring-accent-soft';
 
 export const Input = ({ className = '', ...props }) => <input className={`${inputClass} ${className}`} {...props} />;
 export const Textarea = ({ className = '', ...props }) => <textarea className={`${inputClass} h-24 ${className}`} {...props} />;
@@ -139,44 +157,47 @@ export const Select = ({ children, className = '', ...props }) => (
   <select className={`${inputClass} ${className}`} {...props}>{children}</select>
 );
 
-// --- Modal ---
-export const Modal = ({ title, children, onClose, size = 'md', footer }) => {
-  const sizes = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-    '2xl': 'max-w-6xl',
-  };
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto">
-      <div className={`bg-white rounded-lg shadow-xl w-full ${sizes[size]} my-8`}>
-        <div className="p-5 border-b flex justify-between items-center sticky top-0 bg-white rounded-t-lg z-10">
-          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-        {footer && <div className="p-4 bg-gray-50 border-t flex justify-end space-x-3 rounded-b-lg">{footer}</div>}
-      </div>
-    </div>
-  );
+const MODAL_SIZES = {
+  sm: 'max-w-md',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+  '2xl': 'max-w-6xl',
 };
+
+const ModalTitle = ({ title, onClose }) => (
+  <div className="px-6 py-5 border-b border-line flex justify-between items-center gap-3">
+    <h3 className="font-display text-xl font-extrabold tracking-display text-ink">{title}</h3>
+    <button
+      type="button"
+      onClick={onClose}
+      aria-label="Kapat"
+      className="h-10 w-10 -mr-2 flex items-center justify-center rounded-pop text-muted hover:text-ink hover:bg-surface transition-colors duration-120 ease-pop"
+    >
+      <X size={20} />
+    </button>
+  </div>
+);
+
+// --- Modal ---
+export const Modal = ({ title, children, onClose, size = 'md', footer }) => (
+  <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className={`bg-elevated rounded-bento border border-line w-full ${MODAL_SIZES[size]} my-8`}>
+      <div className="sticky top-0 bg-elevated rounded-t-bento z-10"><ModalTitle title={title} onClose={onClose} /></div>
+      <div className="p-6">{children}</div>
+      {footer && <div className="px-6 py-4 bg-surface border-t border-line flex justify-end gap-3 rounded-b-bento">{footer}</div>}
+    </div>
+  </div>
+);
 
 // Form içeren modal: gönderim ve standart buton ayağı
 export const FormModal = ({ title, children, onSubmit, onClose, size = 'md', submitLabel = 'Kaydet' }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto">
-    <div className={`bg-white rounded-lg shadow-xl w-full my-8 ${({ sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', '2xl': 'max-w-6xl' })[size]}`}>
+  <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className={`bg-elevated rounded-bento border border-line w-full my-8 ${MODAL_SIZES[size]}`}>
       <form onSubmit={onSubmit}>
-        <div className="p-5 border-b flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-        <div className="p-4 bg-gray-50 border-t flex justify-end space-x-3">
+        <ModalTitle title={title} onClose={onClose} />
+        <div className="p-6">{children}</div>
+        <div className="px-6 py-4 bg-surface border-t border-line flex justify-end gap-3 rounded-b-bento">
           <Button type="button" variant="secondary" onClick={onClose}>İptal</Button>
           <Button type="submit">{submitLabel}</Button>
         </div>
@@ -195,7 +216,7 @@ export const ActionMenu = ({ items }) => {
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-        className="p-2 rounded-full hover:bg-gray-200 text-gray-500"
+        className="h-10 w-10 inline-flex items-center justify-center rounded-pop text-muted hover:bg-surface hover:text-ink transition-colors duration-120 ease-pop"
         aria-label="İşlemler"
       >
         <MoreVertical size={18} />
@@ -208,7 +229,7 @@ export const ActionMenu = ({ items }) => {
                 key={i}
                 type="button"
                 onClick={() => { setOpen(false); it.onClick && it.onClick(); }}
-                className={`flex items-center gap-3 px-3 py-3 text-sm text-left rounded-lg hover:bg-gray-100 ${it.danger ? 'text-red-600' : 'text-gray-700'}`}
+                className={`flex items-center gap-3 px-3 min-h-[44px] text-sm font-medium text-left rounded-pop hover:bg-surface transition-colors duration-120 ease-pop ${it.danger ? 'text-red-600' : 'text-ink'}`}
               >
                 {it.icon && <it.icon size={17} />}
                 {it.label}
@@ -233,6 +254,6 @@ export const ConfirmDialog = ({ message, onConfirm, onClose }) => (
       </>
     }
   >
-    <p className="text-gray-600">{message}</p>
+    <p className="text-sm text-muted">{message}</p>
   </Modal>
 );

@@ -2,46 +2,119 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   SWISS DATA POP — tasarım jetonları
+   Swiss Graphic Design × Editorial Data Viz × Neo-Brutalist
+   vurgular × yuvarlatılmış bento yüzeyler.
+   ============================================================ */
+:root {
+  --c-canvas: #1D1D1F;
+  --c-ink: #0B0B0C;
+  --c-surface: #FAFAFA;
+  --c-elevated: #FFFFFF;
+  --c-accent: #F43B04;
+  --c-accent-hover: #DB3300;
+  --c-accent-soft: #FFE3D9;
+  --c-accent-text: #A32A00;
+  --c-muted: #676767;
+  --c-border: #E9E9E9;
+  --c-gridline: #DCDCDC;
+
+  /* hareket */
+  --m-fast: 120ms;
+  --m-base: 200ms;
+  --m-slow: 320ms;
+  --m-ease: cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Koyu mod: yüzeyler koyulaşır, vurgu rengi korunur (kontrast için
+   yumuşak/soft tonlar yeniden tanımlanır). */
+.dark {
+  --c-ink: #F5F5F5;
+  --c-surface: #1D1D1F;
+  --c-elevated: #28282B;
+  --c-muted: #A1A1A1;
+  --c-border: #3A3A3E;
+  --c-gridline: #333337;
+  --c-accent-soft: #3A1B10;
+  --c-accent-text: #FF8355;
+}
+
 body {
-  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: Inter, 'Inter Tight', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--c-surface);
+  color: var(--c-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Cam efekti (glassmorphism) yardımcı sınıfı */
-.glass {
-  background-color: rgba(255, 255, 255, 0.72);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+/* Başlıklar sıkı harf aralığıyla Inter Tight kullanır. */
+.font-display { font-family: 'Inter Tight', Inter, ui-sans-serif, system-ui, sans-serif; }
+
+/* --- Doku: 135° tarama (hatch) --- */
+.pop-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--c-gridline) 0 1.5px,
+    transparent 1.5px 6px
+  );
 }
-.dark .glass {
-  background-color: rgba(31, 41, 55, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* --- Doku: nokta matrisi --- */
+.pop-dots {
+  background-image: radial-gradient(var(--c-gridline) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+/* Neo-brutalist sert kenar vurgusu (gölge değil, ofset blok) */
+.pop-edge { box-shadow: 4px 4px 0 0 var(--c-ink); }
+.pop-edge-accent { box-shadow: 4px 4px 0 0 var(--c-accent); }
+
+/* Hareket: kullanıcı azaltılmış hareket istiyorsa tüm geçişler durur. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Klavye odağı her yerde görünür (WCAG 2.2 — 3:1 kontrast) */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* Cam efekti (glassmorphism) yardımcı sınıfı — yalnızca işlem detayı
+   açılır penceresinde kullanılır; Swiss Data Pop yüzeyleriyle uyumlu
+   olması için opaklık artırıldı, bulanıklık düşürüldü. */
+.glass {
+  background-color: var(--c-elevated);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--c-border);
 }
 
 /* --- Uygulama geneli KOYU MOD (sınıf tabanlı override) --- */
-.dark body { background-color: #0b1220; color: #e5e7eb; }
-.dark .bg-white { background-color: #1f2937 !important; }
-.dark .bg-gray-50 { background-color: #111827 !important; }
-.dark .bg-gray-100 { background-color: #0b1220 !important; }
+.dark body { background-color: #1D1D1F; color: #F5F5F5; }
+.dark .bg-white { background-color: #28282B !important; }
+.dark .bg-gray-50 { background-color: #202023 !important; }
+.dark .bg-gray-100 { background-color: #1D1D1F !important; }
 .dark .text-gray-900,
 .dark .text-gray-800,
-.dark .text-gray-700 { color: #f1f5f9 !important; }
-.dark .text-gray-600 { color: #cbd5e1 !important; }
-.dark .text-gray-500 { color: #9aa6b5 !important; }
-.dark .text-gray-400 { color: #6b7280 !important; }
+.dark .text-gray-700 { color: #F5F5F5 !important; }
+.dark .text-gray-600 { color: #D4D4D4 !important; }
+.dark .text-gray-500 { color: #A1A1A1 !important; }
+.dark .text-gray-400 { color: #8A8A8A !important; }
 .dark .border-gray-200,
-.dark .border-gray-100 { border-color: #374151 !important; }
-.dark .border-gray-300 { border-color: #4b5563 !important; }
+.dark .border-gray-100 { border-color: #3A3A3E !important; }
+.dark .border-gray-300 { border-color: #4A4A4F !important; }
 .dark .hover\:bg-gray-50:hover,
-.dark .hover\:bg-gray-100:hover { background-color: #374151 !important; }
-.dark .hover\:bg-gray-200:hover { background-color: #4b5563 !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #333337 !important; }
+.dark .hover\:bg-gray-200:hover { background-color: #3A3A3E !important; }
 .dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
-.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #374151 !important; }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #3A3A3E !important; }
 /* form alanları için odak/zemin uyumu */
-.dark select option { background-color: #1f2937; color: #f1f5f9; }
+.dark select option { background-color: #28282B; color: #F5F5F5; }
 
 /* --- Piyasa ticker'ı (yatay kayan yazı) --- */
 .marquee-mask { position: relative; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }

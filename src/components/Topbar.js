@@ -1,4 +1,4 @@
-// --- Üst bar: arama, takvim, bildirim, profil (glassmorphism açılır menüler) ---
+// --- Üst bar: arama, takvim, bildirim, profil ---
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Menu, Search, Calendar, Bell, Mail, Settings as SettingsIcon, LogOut,
@@ -14,13 +14,13 @@ export const AVATARS = { user: User, round: UserRound, smile: Smile, cat: Cat, c
 const Pop = ({ children, onClose, width = 'w-80' }) => (
   <>
     <div className="fixed inset-0 z-30" onClick={onClose} />
-    <div className={`absolute right-0 mt-2 ${width} max-w-[92vw] rounded-2xl glass p-2 z-40 text-gray-700 dark:text-gray-100`}>
+    <div className={`absolute right-0 mt-2 ${width} max-w-[92vw] rounded-card glass p-2 z-40 text-ink`}>
       {children}
     </div>
   </>
 );
 
-const iconBtn = 'relative flex items-center justify-center w-10 h-10 rounded-full glass text-gray-600 dark:text-gray-200 hover:opacity-90';
+const iconBtn = 'relative flex items-center justify-center w-11 h-11 rounded-full bg-elevated border border-line text-muted hover:text-ink hover:bg-surface transition-colors duration-120 ease-pop';
 
 export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogout, dark, toggleDark, logo, avatar = 'user', setAvatar, pendingPaymentRequests = 0, renewalReminderDays = null }) {
   const { customers = [], products = [], invoices = [], reminders = [], checks = [], zReports = [] } = data;
@@ -79,8 +79,8 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
   const AvatarIcon = AVATARS[avatar] || User;
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 h-16 px-3 sm:px-6 glass border-b border-white/30 dark:border-white/10 no-print">
-      <button onClick={onOpenMobile} className="md:hidden flex items-center justify-center w-10 h-10 rounded-full glass text-gray-600 dark:text-gray-200"><Menu size={20} /></button>
+    <header className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 h-16 px-3 sm:px-6 bg-elevated border-b border-line no-print">
+      <button onClick={onOpenMobile} className="md:hidden flex items-center justify-center w-11 h-11 rounded-full bg-elevated border border-line text-muted"><Menu size={20} /></button>
 
       {logo && (
         <button onClick={() => go('dashboard')} title="Gösterge Paneli" className="md:hidden flex items-center hover:opacity-80">
@@ -90,23 +90,23 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
 
       {/* Arama */}
       <div className="relative flex-1 max-w-md" ref={searchRef}>
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Cari, ürün, fatura ara..."
-          className="w-full pl-9 pr-3 py-2 rounded-full glass text-sm text-gray-700 dark:text-gray-100 placeholder-gray-400 outline-none focus:ring-2 focus:ring-orange-400"
+          className="w-full pl-9 pr-3 min-h-[44px] rounded-full bg-surface border border-line text-sm text-ink placeholder-muted outline-none transition-colors duration-120 ease-pop focus:border-accent focus:ring-2 focus:ring-accent-soft"
         />
         {q.trim().length >= 2 && (
-          <div className="absolute left-0 right-0 mt-2 rounded-2xl glass p-2 z-40">
+          <div className="absolute left-0 right-0 mt-2 rounded-card glass p-2 z-40">
             {results.length === 0 ? (
-              <p className="text-sm text-gray-400 px-3 py-3 text-center">Sonuç yok</p>
+              <p className="text-sm text-muted px-3 py-3 text-center">Sonuç yok</p>
             ) : results.map((r, i) => (
-              <button key={i} onClick={() => go(r.page)} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left">
-                <span className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center"><r.icon size={15} /></span>
+              <button key={i} onClick={() => go(r.page)} className="flex items-center gap-3 w-full px-3 py-2 rounded-pop hover:bg-surface text-left">
+                <span className="w-8 h-8 rounded-slab bg-accent-soft text-accent-text flex items-center justify-center"><r.icon size={15} /></span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{r.label}</span>
-                  <span className="block text-xs text-gray-400">{r.sub}</span>
+                  <span className="block text-sm font-semibold text-ink truncate">{r.label}</span>
+                  <span className="block text-xs text-muted">{r.sub}</span>
                 </span>
               </button>
             ))}
@@ -117,7 +117,7 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
       <div className="flex-1 hidden sm:block" />
 
       {/* Koyu mod */}
-      <button onClick={toggleDark} title={dark ? 'Açık mod' : 'Koyu mod'} className={`${iconBtn} text-gray-600 dark:text-yellow-300`}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+      <button onClick={toggleDark} title={dark ? 'Açık mod' : 'Koyu mod'} className={iconBtn}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
 
       {/* Takvim */}
       <div className="relative">
@@ -126,11 +126,11 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
           <Pop onClose={() => setOpen(null)}>
             <div className="flex justify-between items-center px-2 py-1.5">
               <span className="text-sm font-semibold">Yaklaşanlar</span>
-              <button onClick={() => go('agenda')} className="text-xs text-orange-600">Ajanda</button>
+              <button onClick={() => go('agenda')} className="text-xs font-semibold text-accent-text">Ajanda</button>
             </div>
-            {upcoming.length === 0 ? <p className="text-sm text-gray-400 px-3 py-4 text-center">Yaklaşan kayıt yok</p> : upcoming.map((u, i) => (
-              <button key={i} onClick={() => go(u.page)} className="flex items-center justify-between w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left">
-                <span className="min-w-0"><span className="block text-sm truncate">{u.label}</span><span className="text-xs text-gray-400">{u.type}</span></span>
+            {upcoming.length === 0 ? <p className="text-sm text-muted px-3 py-4 text-center">Yaklaşan kayıt yok</p> : upcoming.map((u, i) => (
+              <button key={i} onClick={() => go(u.page)} className="flex items-center justify-between w-full px-3 py-2 rounded-pop hover:bg-surface text-left">
+                <span className="min-w-0"><span className="block text-sm truncate">{u.label}</span><span className="text-xs text-muted">{u.type}</span></span>
                 <span className="text-xs text-gray-500 whitespace-nowrap ml-2">{formatDateShort(u.date)}</span>
               </button>
             ))}
@@ -145,13 +145,13 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
       <div className="relative">
         <button onClick={() => setOpen(open === 'bell' ? null : 'bell')} className={iconBtn} title="Bildirimler">
           <Bell size={18} />
-          {notifications.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-orange-600 text-white text-[10px] flex items-center justify-center">{notifications.length}</span>}
+          {notifications.length > 0 && <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center">{notifications.length}</span>}
         </button>
         {open === 'bell' && (
           <Pop onClose={() => setOpen(null)}>
             <p className="text-sm font-semibold px-2 py-1.5">Bildirimler</p>
-            {notifications.length === 0 ? <p className="text-sm text-gray-400 px-3 py-4 text-center">Bildirim yok 🎉</p> : notifications.map((n, i) => (
-              <button key={i} onClick={() => go(n.page)} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left">
+            {notifications.length === 0 ? <p className="text-sm text-muted px-3 py-4 text-center">Bildirim yok 🎉</p> : notifications.map((n, i) => (
+              <button key={i} onClick={() => go(n.page)} className="flex items-center gap-3 w-full px-3 py-2 rounded-pop hover:bg-surface text-left">
                 <n.icon size={17} className={n.color} />
                 <span className="text-sm">{n.label}</span>
               </button>
@@ -162,23 +162,23 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
 
       {/* Profil */}
       <div className="relative">
-        <button onClick={() => setOpen(open === 'profile' ? null : 'profile')} className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 text-white flex items-center justify-center shadow-sm"><AvatarIcon size={19} /></button>
+        <button onClick={() => setOpen(open === 'profile' ? null : 'profile')} className="w-11 h-11 rounded-full bg-accent text-white flex items-center justify-center"><AvatarIcon size={19} /></button>
         {open === 'profile' && (
           <Pop onClose={() => setOpen(null)} width="w-64">
-            <div className="px-3 py-2 border-b border-white/30 dark:border-white/10 mb-1">
+            <div className="px-3 py-2 border-b border-line mb-1">
               <p className="text-sm font-semibold truncate">{userEmail}</p>
-              <p className="text-xs text-gray-400">Senkronize hesap</p>
+              <p className="text-xs text-muted">Senkronize hesap</p>
             </div>
             {setAvatar && (
-              <div className="px-3 py-2 border-b border-white/30 dark:border-white/10 mb-1">
-                <p className="text-xs text-gray-400 mb-1.5">Profil ikonu</p>
+              <div className="px-3 py-2 border-b border-line mb-1">
+                <p className="text-xs text-muted mb-1.5">Profil ikonu</p>
                 <div className="flex gap-1.5">
                   {Object.entries(AVATARS).map(([key, Icon]) => (
                     <button
                       key={key}
                       onClick={() => setAvatar(key)}
                       title={key}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${avatar === key ? 'bg-orange-600 text-white' : 'bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/20'}`}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${avatar === key ? 'bg-accent text-white' : 'bg-surface border border-line text-muted hover:text-ink'}`}
                     >
                       <Icon size={17} />
                     </button>
@@ -186,9 +186,9 @@ export default function Topbar({ data, setPage, onOpenMobile, userEmail, onLogou
                 </div>
               </div>
             )}
-            <button onClick={() => go('settings')} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm"><SettingsIcon size={16} />Ayarlar</button>
-            <button onClick={() => { toggleDark(); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm">{dark ? <Sun size={16} /> : <Moon size={16} />}{dark ? 'Açık Mod' : 'Koyu Mod'}</button>
-            <button onClick={() => { onLogout(); setOpen(null); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-left text-sm text-rose-600"><LogOut size={16} />Çıkış Yap</button>
+            <button onClick={() => go('settings')} className="flex items-center gap-3 w-full px-3 py-2 rounded-pop hover:bg-surface text-left text-sm"><SettingsIcon size={16} />Ayarlar</button>
+            <button onClick={() => { toggleDark(); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-pop hover:bg-surface text-left text-sm">{dark ? <Sun size={16} /> : <Moon size={16} />}{dark ? 'Açık Mod' : 'Koyu Mod'}</button>
+            <button onClick={() => { onLogout(); setOpen(null); }} className="flex items-center gap-3 w-full px-3 py-2 rounded-pop hover:bg-surface text-left text-sm text-rose-600"><LogOut size={16} />Çıkış Yap</button>
           </Pop>
         )}
       </div>
