@@ -96,8 +96,8 @@ const NAV_GROUPS = [
 const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAdmin, onLogout, logo, mobileOpen, setMobileOpen, onOpenCalc }) => (
   <>
     {mobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
-    <nav className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-gray-800 text-white flex flex-col no-print transform transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700 flex-shrink-0">
+    <nav className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-canvas text-white flex flex-col no-print transform transition-transform duration-320 ease-pop md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="flex items-center justify-between h-16 px-4 border-b border-white/10 flex-shrink-0">
         <button
           type="button"
           onClick={() => { setCurrentPage('dashboard'); setMobileOpen(false); }}
@@ -108,17 +108,17 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAdmin, onLogout, lo
             <img src={logo} alt="Logo" className="h-10 max-w-[170px] object-contain" />
           ) : (
             <>
-              <span className="text-2xl font-bold text-orange-400">S</span>
-              <h1 className="text-lg font-bold ml-2 tracking-wide">SAGG Defter</h1>
+              <span className="h-8 w-8 rounded-pop bg-accent text-white font-display text-lg font-black flex items-center justify-center">S</span>
+              <h1 className="font-display text-lg font-extrabold ml-2.5 tracking-display">SAGG Defter</h1>
             </>
           )}
         </button>
-        <button className="md:hidden text-gray-400" onClick={() => setMobileOpen(false)}><X size={20} /></button>
+        <button className="md:hidden text-white/60 hover:text-white" aria-label="Menüyü kapat" onClick={() => setMobileOpen(false)}><X size={20} /></button>
       </div>
       <div className="flex-1 overflow-y-auto py-4">
         {NAV_GROUPS.map((group) => (
           <div key={group.title} className="mb-3">
-            <p className="px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{group.title}</p>
+            <p className="px-5 text-[10px] font-bold text-white/40 uppercase tracking-[0.14em] mb-2">{group.title}</p>
             <ul>
               {group.items.map((item) => (
                 <li key={item.id} className="px-2">
@@ -127,7 +127,7 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAdmin, onLogout, lo
                       if (item.action === 'calc') { onOpenCalc(); setMobileOpen(false); }
                       else { setCurrentPage(item.id); setMobileOpen(false); }
                     }}
-                    className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === item.id && !item.action ? 'bg-orange-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                    className={`flex items-center w-full px-3 min-h-[44px] rounded-pop transition-colors duration-120 ease-pop text-sm ${currentPage === item.id && !item.action ? 'bg-accent text-white font-semibold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                   >
                     <item.icon className="h-5 w-5 flex-shrink-0" />
                     <span className="ml-3 font-medium">{item.label}</span>
@@ -139,12 +139,12 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAdmin, onLogout, lo
         ))}
         {isAdmin && (
           <div className="mb-3">
-            <p className="px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Yönetim</p>
+            <p className="px-5 text-[10px] font-bold text-white/40 uppercase tracking-[0.14em] mb-2">Yönetim</p>
             <ul>
               <li className="px-2">
                 <button
                   onClick={() => { setCurrentPage('admin'); setMobileOpen(false); }}
-                  className={`flex items-center w-full px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === 'admin' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                  className={`flex items-center w-full px-3 min-h-[44px] rounded-pop transition-colors duration-120 ease-pop text-sm ${currentPage === 'admin' ? 'bg-accent text-white font-semibold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                 >
                   <ShieldCheck className="h-5 w-5 flex-shrink-0" />
                   <span className="ml-3 font-medium">Abonelikler</span>
@@ -154,12 +154,12 @@ const Sidebar = ({ currentPage, setCurrentPage, userEmail, isAdmin, onLogout, lo
           </div>
         )}
       </div>
-      <div className="p-3 border-t border-gray-700">
-        <div className="flex items-center gap-2 text-xs text-emerald-300 mb-1">
-          <Cloud size={14} /> Senkronize
+      <div className="p-3 border-t border-white/10">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-400 mb-1.5">
+          <Cloud size={13} /> Senkronize
         </div>
-        <p className="text-xs text-gray-300 break-all mb-2">{userEmail}</p>
-        <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg py-2 text-sm font-medium">
+        <p className="text-xs text-white/60 break-all mb-2.5">{userEmail}</p>
+        <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full min-h-[44px] bg-white/10 hover:bg-white/20 text-white rounded-pop text-sm font-semibold transition-colors duration-120 ease-pop">
           <LogOut size={15} /> Çıkış Yap
         </button>
       </div>
@@ -314,7 +314,7 @@ export default function App() {
   }, [userId, data]);
 
   if (!authChecked || (userId && (!subLoaded || loading))) {
-    return <div className="flex items-center justify-center h-screen bg-gray-100"><Spinner /></div>;
+    return <div className="flex items-center justify-center h-screen bg-surface"><Spinner /></div>;
   }
 
   if (!userId) {
@@ -362,7 +362,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
+    <div className="flex h-screen bg-surface text-ink font-sans">
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
@@ -405,16 +405,18 @@ const LOCK_MESSAGES = {
 
 function SubscriptionLocked({ entitlement, onLogout, onPay }) {
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
-        <Lock className="mx-auto h-10 w-10 text-orange-500 mb-3" />
-        <h2 className="text-lg font-bold text-gray-800 mb-2">Erişim Kısıtlı</h2>
-        <p className="text-sm text-gray-600 mb-1">{LOCK_MESSAGES[entitlement] || LOCK_MESSAGES.none}</p>
-        <p className="text-sm text-gray-500 mb-6">Devam etmek için aboneliğinizi yenileyin veya hesabınızı yöneten kişiyle iletişime geçin.</p>
-        <button onClick={onPay} className="flex items-center justify-center gap-2 w-full bg-orange-600 hover:bg-orange-700 text-white rounded-lg py-2 text-sm font-medium mx-auto mb-2">
+    <div className="flex items-center justify-center h-screen bg-surface p-4">
+      <div className="bg-elevated rounded-bento border border-line w-full max-w-md p-8 text-center">
+        <div className="mx-auto h-12 w-12 rounded-pop bg-accent-soft flex items-center justify-center mb-4">
+          <Lock className="h-6 w-6 text-accent-text" />
+        </div>
+        <h2 className="font-display text-2xl font-extrabold tracking-hero text-ink mb-2">Erişim Kısıtlı</h2>
+        <p className="text-sm text-ink mb-1">{LOCK_MESSAGES[entitlement] || LOCK_MESSAGES.none}</p>
+        <p className="text-sm text-muted mb-6">Devam etmek için aboneliğinizi yenileyin veya hesabınızı yöneten kişiyle iletişime geçin.</p>
+        <button onClick={onPay} className="flex items-center justify-center gap-2 w-full min-h-[44px] bg-accent hover:bg-accent-hover text-white rounded-pop text-sm font-semibold mx-auto mb-2 transition-colors duration-120 ease-pop">
           Ödeme Yap / Süre Uzat
         </button>
-        <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full bg-gray-700 hover:bg-gray-800 text-white rounded-lg py-2 text-sm font-medium mx-auto">
+        <button onClick={onLogout} className="flex items-center justify-center gap-2 w-full min-h-[44px] bg-elevated border border-line hover:bg-surface text-ink rounded-pop text-sm font-semibold mx-auto transition-colors duration-120 ease-pop">
           <LogOut size={15} /> Çıkış Yap
         </button>
       </div>
