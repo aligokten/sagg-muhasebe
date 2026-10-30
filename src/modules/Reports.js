@@ -7,7 +7,9 @@ import { allCariBalances } from '../finance';
 import { flatCategories } from '../categories';
 import { PageHeader, Card, Select, Input } from '../components/ui';
 
-const PIE_COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899', '#84cc16'];
+// Tek hüzmeli (vermilyon) sıralı rampa: açıklık kademeli azaldığı için
+// dilimler gri tonlamada ve renk körlüğünde de birbirinden ayırt edilir.
+const PIE_COLORS = ['#6B1B00', '#A32A00', '#DB3300', '#F43B04', '#FD6336', '#FF9B78', '#FFC7B3', '#FFE3D9'];
 
 const PERIODS = [
   { key: 'day', label: 'Günlük' },

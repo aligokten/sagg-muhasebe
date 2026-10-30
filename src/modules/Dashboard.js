@@ -38,11 +38,11 @@ const TxDetailModal = ({ item, onClose }) => {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-3xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-gray-800/50 backdrop-blur-2xl shadow-2xl p-6 text-gray-800 dark:text-gray-100"
+        className="relative w-full max-w-md rounded-bento border border-white/40 dark:border-white/10 bg-white/60 dark:bg-gray-800/50 backdrop-blur-2xl shadow-2xl p-6 text-gray-800 dark:text-gray-100"
         style={{ boxShadow: '0 8px 32px rgba(31,38,135,0.25)' }}
       >
         {/* Cam üstü parlaklık */}
-        <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-white/50 to-transparent dark:from-white/10" />
+        <div className="pointer-events-none absolute inset-0 rounded-bento bg-gradient-to-br from-white/50 to-transparent dark:from-white/10" />
         <button
           onClick={onClose}
           aria-label="Kapat"
@@ -226,9 +226,9 @@ export default function Dashboard({ data, setPage }) {
 
   const quote = useMemo(() => randomQuote(), []);
 
-  const card = 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm';
-  const heading = 'text-gray-800 dark:text-gray-100';
-  const muted = 'text-gray-400 dark:text-gray-500';
+  const card = 'bg-elevated border border-line';
+  const heading = 'text-ink';
+  const muted = 'text-muted';
 
   return (
     <div>
@@ -275,7 +275,7 @@ export default function Dashboard({ data, setPage }) {
         {/* SOL SÜTUN */}
         <div className="lg:col-span-2 flex flex-col gap-5">
           {/* Özet */}
-          <div className={`rounded-3xl p-5 ${card}`}>
+          <div className={`rounded-bento p-5 ${card}`}>
             <div className="flex justify-between items-center mb-1">
               <div>
                 <h3 className={`font-semibold ${heading}`}>Özet</h3>
@@ -300,10 +300,10 @@ export default function Dashboard({ data, setPage }) {
               </div>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={chart} margin={{ top: 6, right: 0, left: 0, bottom: 0 }} barCategoryGap="24%">
-                  <XAxis dataKey="ay" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                  <XAxis dataKey="ay" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#676767' }} />
                   <Tooltip cursor={{ fill: 'transparent' }} formatter={(v) => formatCurrency(v)} contentStyle={{ borderRadius: 12, border: '1px solid #eee', fontSize: 12 }} />
                   <Bar dataKey="tutar" radius={[8, 8, 8, 8]} maxBarSize={24}>
-                    {chart.map((c, i) => <Cell key={i} fill={i < Math.ceil(chart.length * 0.6) ? '#ea580c' : '#fcd9b6'} />)}
+                    {chart.map((c, i) => <Cell key={i} fill={i < Math.ceil(chart.length * 0.6) ? '#F43B04' : '#FFE3D9'} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -318,7 +318,7 @@ export default function Dashboard({ data, setPage }) {
               { label: 'Kasa / Banka', value: cashTotal, icon: Wallet, c: 'text-violet-600 bg-violet-50' },
               { label: 'Toplam Alacak', value: receivable, icon: ArrowUpRight, c: 'text-rose-600 bg-rose-50' },
             ].map((s, i) => (
-              <div key={i} className={`rounded-3xl p-5 ${card}`}>
+              <div key={i} className={`rounded-bento p-5 ${card}`}>
                 <div className="flex items-center gap-2 text-xs text-gray-500"><span className={`w-7 h-7 rounded-lg flex items-center justify-center ${s.c}`}><s.icon size={15} /></span>{s.label}</div>
                 {s.ch !== undefined && <div className="mt-2"><ChangeBadge value={s.ch} /></div>}
                 <p className={`text-lg font-bold mt-2 ${heading}`}>{formatCurrency(s.value)}</p>
@@ -327,7 +327,7 @@ export default function Dashboard({ data, setPage }) {
           </div>
 
           {/* Net Durum */}
-          <div className="rounded-3xl p-5 bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md flex items-center justify-between">
+          <div className="rounded-bento p-5 bg-accent text-white flex items-center justify-between">
             <div>
               <p className="font-semibold">Net Durum</p>
               <p className="text-xs text-white/70 mt-0.5">Gelir − Gider</p>
@@ -345,29 +345,29 @@ export default function Dashboard({ data, setPage }) {
               <p className={`text-xs ${muted}`}>Akışınızı takip edin</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className={`rounded-3xl p-4 ${card}`}>
+              <div className={`rounded-bento p-4 ${card}`}>
                 <p className={`text-sm font-medium ${heading}`}>Tahsilat</p>
                 <div className="mt-2"><ChangeBadge value={tahsilatChange} /></div>
                 <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(tahsilatTotal)}</p>
-                <div className="mt-2"><Spark data={tahsilatSeries} color="#ea580c" id="t" /></div>
+                <div className="mt-2"><Spark data={tahsilatSeries} color="#F43B04" id="t" /></div>
               </div>
-              <div className={`rounded-3xl p-4 ${card}`}>
+              <div className={`rounded-bento p-4 ${card}`}>
                 <p className={`text-sm font-medium ${heading}`}>Gelir</p>
                 <div className="mt-2"><ChangeBadge value={incomeChange} /></div>
                 <p className={`text-xl font-bold mt-2 ${heading}`}>{formatCurrency(totalIncome)}</p>
-                <div className="mt-2"><Spark data={gelirSeries} color="#f59e0b" id="g" /></div>
+                <div className="mt-2"><Spark data={gelirSeries} color="#8A2300" id="g" /></div>
               </div>
-              <div className="rounded-3xl p-4 bg-gradient-to-br from-[#3a2415] to-[#5a3010] text-white shadow-md">
+              <div className="rounded-bento p-4 bg-canvas text-white">
                 <p className="text-sm font-medium">Gider</p>
                 <div className="mt-2"><ChangeBadge value={expenseChange} light /></div>
                 <p className="text-xl font-bold mt-2">{formatCurrency(totalExpense)}</p>
-                <div className="mt-2"><Spark data={giderSeries} color="#fb923c" id="e" /></div>
+                <div className="mt-2"><Spark data={giderSeries} color="#FD6336" id="e" /></div>
               </div>
             </div>
           </div>
 
           {/* İşlem Geçmişi */}
-          <div className={`rounded-3xl p-5 flex-1 ${card}`}>
+          <div className={`rounded-bento p-5 flex-1 ${card}`}>
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className={`font-semibold ${heading}`}>İşlem Geçmişi</h3>
