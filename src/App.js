@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings as SettingsIcon, Users, Package,
-  Landmark, Ruler, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
+  Landmark, FileText, ClipboardList, Truck, ScrollText, UserCog, CalendarClock,
   TrendingUp, X, DraftingCompass, LogOut, Cloud, ListChecks, Calculator,
   HardHat, FileBarChart, ShieldCheck, Lock, CreditCard,
 } from 'lucide-react';
@@ -39,7 +39,6 @@ import Settings from './modules/Settings';
 import AllTransactions from './modules/AllTransactions';
 import ZReport from './modules/ZReport';
 import { CalculatorModal } from './components/DashboardGadgets';
-import ArsaPaylastir from './ArsaPaylastir';
 import { buildZReport, getMissingReportDates } from './zreport';
 
 const EMPTY_DATA = COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: [] }), {});
@@ -87,7 +86,6 @@ const NAV_GROUPS = [
     items: [
       { id: 'reports', label: 'Raporlar', icon: BarChart3 },
       { id: 'calculator', label: 'Hesap Makinesi', icon: Calculator, action: 'calc' },
-      { id: 'arsapay', label: 'Arsa Paylaştır', icon: Ruler },
       { id: 'settings', label: 'Ayarlar', icon: SettingsIcon },
     ],
   },
@@ -355,7 +353,6 @@ export default function App() {
       case 'zreport': return <ZReport data={fullData} />;
       case 'reports': return <Reports data={fullData} />;
       case 'agenda': return <Agenda data={fullData} userId={userId} />;
-      case 'arsapay': return <ArsaPaylastir />;
       case 'settings': return <Settings userId={userId} userEmail={userEmail} companyProfile={data.companyProfile} data={fullData} />;
       default: return <Dashboard data={fullData} setPage={setCurrentPage} />;
     }

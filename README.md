@@ -28,7 +28,6 @@ olarak senkronize edilir.
 - **Raporlar** — KDV raporu, aylık gelir/gider grafiği, gider dağılımı, cari yaşlandırma
 - **Gösterge Paneli** — Genel finansal özet, trend grafiği, uyarılar
 - **Ajanda** — Görev ve hatırlatıcılar
-- **Arsa Paylaştır** — Parsel bölme / arsa paylaştırma aracı
 - **Ayarlar** — Şirket profili ve fatura banka bilgileri
 
 ## Muhasebe Motoru
@@ -54,7 +53,6 @@ src/
   modules/                 Dashboard, Customers, Products, Invoices, Quotes,
                            Orders, Waybills, Accounts, Checks, CashFlow,
                            Personnel, Reports, Agenda, Settings
-  ArsaPaylastir.js         Arsa paylaştırma modülü
 ```
 
 ## Kurulum
