@@ -1,6 +1,6 @@
 {
   "name": "sagg-muhasebe-app",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "homepage": ".",
   "description": "SAGG Muhasebe — ön muhasebe ve gelir/gider takip uygulaması",
@@ -30,7 +30,8 @@
     "electron": "electron .",
     "electron:build": "npm run build && electron .",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:win:dir": "npm run build && electron-builder --win --dir"
+    "dist:win:dir": "npm run build && electron-builder --win --dir",
+    "dist:mac": "npm run build && electron-builder --mac --arm64 --publish never"
   },
   "eslintConfig": {
     "extends": [
@@ -102,6 +103,23 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "SAGG Muhasebe"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "electron/icon-512.png",
+      "category": "public.app-category.finance",
+      "identity": null,
+      "artifactName": "SAGG-Muhasebe-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "SAGG Muhasebe ${version}"
     }
   }
 }

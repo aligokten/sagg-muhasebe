@@ -4,6 +4,7 @@ const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
 const isDev = !app.isPackaged;
+const isMac = process.platform === 'darwin';
 
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
@@ -72,6 +73,31 @@ function checkForUpdates(win, { manual } = {}) {
     }
     return;
   }
+  // macOS sürümü Apple Developer sertifikasıyla imzalanmadığı için
+  // electron-updater orada çalışamaz (imzasız uygulamada güncelleme denetimi
+  // her zaman hata verir). Kullanıcıya "internet bağlantınızı kontrol edin"
+  // gibi yanıltıcı bir hata göstermek yerine durum açıkça söyleniyor.
+  if (isMac) {
+    if (manual) {
+      dialog
+        .showMessageBox(win, {
+          type: 'info',
+          title: 'Güncelleme',
+          message: 'macOS sürümü otomatik güncellenmiyor.',
+          detail: 'Yeni sürümü indirme sayfasından alabilirsiniz.',
+          buttons: ['İndirme sayfasını aç', 'Kapat'],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        .then(({ response }) => {
+          if (response === 0) {
+            shell.openExternal('https://github.com/aligokten/sagg-muhasebe/releases');
+          }
+        });
+    }
+    return;
+  }
+
   if (manual) manualCheckPending = true;
   autoUpdater.checkForUpdates().catch((err) => {
     console.error('Güncelleme kontrolü başarısız:', err);
@@ -94,6 +120,11 @@ if (!gotLock) {
 
 function buildMenu(win) {
   const template = [
+    // macOS'ta özel bir menü tanımlandığında Electron'un varsayılan menüsü
+    // tamamen devre dışı kalır. Uygulama menüsü ve Düzen menüsü olmadan
+    // Cmd+C / Cmd+V / Cmd+A / Cmd+Q gibi temel kısayollar çalışmaz; veri
+    // girişi yapılan bir uygulamada bu kabul edilemez.
+    ...(isMac ? [{ role: 'appMenu' }, { label: 'Düzen', role: 'editMenu' }] : []),
     {
       label: 'Görünüm',
       submenu: [
