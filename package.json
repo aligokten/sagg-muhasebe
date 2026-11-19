@@ -1,6 +1,6 @@
 {
   "name": "sagg-muhasebe-app",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "private": true,
   "homepage": ".",
   "description": "SAGG Muhasebe — ön muhasebe ve gelir/gider takip uygulaması",
@@ -74,6 +74,7 @@
       "output": "release",
       "buildResources": "electron"
     },
+    "afterPack": "./scripts/afterPack.js",
     "files": [
       "build/**/*",
       "electron/**/*",
