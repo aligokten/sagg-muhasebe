@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-macos:
@@ -62,3 +62,24 @@ jobs:
         with:
           name: SAGG-Muhasebe-macOS
           path: release/*.dmg
+
+      - name: Publish DMG to the GitHub Release
+        # DMG, Windows kurulumuyla aynı sürüm kaydına eklenir; kullanıcı tek
+        # bir Releases sayfasından indirir. Yalnızca .dmg yüklenir:
+        # latest-mac.yml bilerek dışarıda bırakılır, çünkü imzasız macOS
+        # paketi electron-updater ile güncellenemez ve o dosya çalışmayan bir
+        # güncelleme kanalı açardı (bkz. yukarıdaki derleme adımı).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          surum=$(node -p "require('./package.json').version")
+          etiket="v$surum"
+          dmg=$(ls release/*.dmg)
+          echo "Yüklenecek paket: $dmg -> $etiket"
+          if ! gh release view "$etiket" >/dev/null 2>&1; then
+            echo "$etiket sürüm kaydı yok, oluşturuluyor."
+            gh release create "$etiket" --title "$surum" --notes "SAGG Muhasebe $surum"
+          fi
+          gh release upload "$etiket" "$dmg" --clobber
+          echo "Yüklendi: $(basename "$dmg")"
